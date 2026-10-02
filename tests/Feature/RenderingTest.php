@@ -84,4 +84,17 @@ class RenderingTest extends TestCase
         // The YAML entry is ->collapsed(): its <details> has no `open`, the JSON one has.
         $this->assertSame(1, preg_match_all('/<details[^>]*\sopen/', $html));
     }
+
+    public function test_yaml_entries_dump_collections_and_objects(): void
+    {
+        $setting = $this->setting();
+        $setting->meta = collect(['collected' => 'yes']);
+        $setting->options = (object) ['objectified' => 'yes'];
+        $setting->save();
+
+        $html = Livewire::test(ViewSetting::class, ['record' => $setting->getKey()])->html();
+
+        $this->assertStringContainsString('collected', $html);
+        $this->assertStringContainsString('objectified', $html);
+    }
 }

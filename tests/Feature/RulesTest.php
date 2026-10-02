@@ -105,4 +105,24 @@ class RulesTest extends TestCase
         $this->assertCount(1, $errors);
         $this->assertSame(0, substr_count($errors[0], ';'));
     }
+
+    public function test_schema_rule_on_yaml_sees_dates_as_strings(): void
+    {
+        $rule = JsonSchemaRule::make(['type' => 'object', 'properties' => ['released' => ['type' => 'string']]])->yaml();
+
+        $this->assertSame([], $this->errors("released: 2024-01-01\n", $rule));
+    }
+
+    public function test_yaml_rule_rejects_alias_bombs(): void
+    {
+        $yaml = "a0: &a0 [x, x, x, x, x, x, x, x, x, x]\n";
+
+        for ($level = 1; $level <= 9; $level++) {
+            $yaml .= "a{$level}: &a{$level} [".implode(', ', array_fill(0, 10, '*a'.($level - 1)))."]\n";
+        }
+
+        $this->assertCount(1, $this->errors($yaml, YamlRule::make()));
+        // The schema rule leaves it to the syntax rule instead of walking it.
+        $this->assertSame([], $this->errors($yaml, JsonSchemaRule::make(['type' => 'object'])->yaml()));
+    }
 }

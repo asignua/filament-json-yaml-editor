@@ -26,6 +26,10 @@ return new class extends Migration
             $table->text('settings_text')->nullable(); // JsonEditor, kept as text
             $table->text('config')->nullable();        // YamlEditor, kept as text
             $table->json('config_data')->nullable();   // YamlEditor->asArray()
+            $table->json('meta')->nullable();          // AsCollection, YamlEditor without asArray (follows the cast)
+            $table->json('options')->nullable();       // `object` cast, YamlEditor->asArray()
+            $table->json('extras')->nullable();        // `array` cast, JsonEditor without asArray (follows the cast)
+            $table->json('strict')->nullable();        // `array` cast, JsonEditor->asArray()->validateSyntax(false)
             $table->timestamps();
         });
     }

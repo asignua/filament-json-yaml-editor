@@ -32,6 +32,10 @@ class SettingResource extends Resource
             JsonEditor::make('settings_text')->format(false)->modes([EditorMode::Code]),
             YamlEditor::make('config'),
             YamlEditor::make('config_data')->asArray()->inline(2),
+            YamlEditor::make('meta'),
+            YamlEditor::make('options')->asArray(),
+            JsonEditor::make('extras')->modes([EditorMode::Code]),
+            JsonEditor::make('strict')->asArray()->validateSyntax(false)->modes([EditorMode::Code]),
         ]);
     }
 
@@ -40,6 +44,8 @@ class SettingResource extends Resource
         return $schema->components([
             JsonEntry::make('settings'),
             YamlEntry::make('config_data')->collapsed(),
+            YamlEntry::make('meta'),
+            YamlEntry::make('options'),
         ]);
     }
 

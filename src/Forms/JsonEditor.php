@@ -62,7 +62,9 @@ class JsonEditor extends Field implements HasEmbeddedView
             return $component->isArray() ? Json::decode($state) : $state;
         });
 
-        $this->rule(fn (): array => $this->shouldValidateSyntax()
+        // With ->asArray() the syntax rule stays even after validateSyntax(false): invalid text
+        // would decode to null on save and overwrite the stored value without a word.
+        $this->rule(fn (): array => $this->shouldValidateSyntax() || $this->isArray()
             ? [JsonRule::make()->containerOnly((bool) $this->evaluate($this->onlyContainers))]
             : []);
     }
@@ -135,7 +137,8 @@ class JsonEditor extends Field implements HasEmbeddedView
     }
 
     /**
-     * Turn the automatic "is valid JSON" rule off (the lint in the browser stays).
+     * Turn the automatic "is valid JSON" rule off (the lint in the browser stays). Ignored
+     * with ->asArray(): text that does not parse cannot be stored as an array.
      */
     public function validateSyntax(bool|Closure $condition = true): static
     {

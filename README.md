@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/packagist/l/asignua/filament-json-yaml-editor.svg?style=flat-square)](https://github.com/asignua/filament-json-yaml-editor/blob/main/LICENSE.md)
 [![Plumb score](https://plumbphp.dev/badges/asignua/filament-json-yaml-editor/composite.svg)](https://plumbphp.dev/asignua/filament-json-yaml-editor)
 
-<img class="filament-hidden" src="https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/v1.0.0/art/cover.jpg" alt="Filament JSON & YAML Editor">
+<img class="filament-hidden" src="https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/main/art/cover.jpg" alt="Filament JSON & YAML Editor">
 
 JSON and YAML editing for [Filament](https://filamentphp.com) 5: two form fields and two infolist entries.
 
@@ -33,15 +33,15 @@ has no Filament 4/5 release, and YAML editing has had nothing at all.
 
 ## Screenshots
 
-![JSON code view with highlighting and a Format button](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/v1.0.0/art/json-code.jpg)
+![JSON code view with highlighting and a Format button](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/main/art/json-code.jpg)
 
-![JSON tree view with edit, add and remove](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/v1.0.0/art/json-tree.jpg)
+![JSON tree view with edit, add and remove](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/main/art/json-tree.jpg)
 
-![YAML editor with a lint error on the offending line](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/v1.0.0/art/yaml.jpg)
+![YAML editor with a lint error on the offending line](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/main/art/yaml.jpg)
 
-![Dark mode](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/v1.0.0/art/json-dark.jpg)
+![Dark mode](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/main/art/json-dark.jpg)
 
-![Read-only entries with collapse and copy](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/v1.0.0/art/entries.jpg)
+![Read-only entries with collapse and copy](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/main/art/entries.jpg)
 
 ## Requirements
 
@@ -85,15 +85,25 @@ YamlEditor::make('config')
 ```
 
 State is **text** by default: what the user typed is what the model gets, comments and formatting included.
-`->asArray()` hands the model a decoded array instead. An array coming from the model is always shown as text, whatever
-this setting says, so a `json` column cast to `array` works with and without `->asArray()`. Blank text is stored as `null`.
+`->asArray()` hands the model a decoded array instead. An array (a Collection, an `ArrayObject`, an object) coming from
+the model is always shown as text. Blank text is stored as `null`.
+
+Without an explicit `->asArray()` the field follows the model's cast: a column cast to `array`, `json`, `object`,
+`collection`, `AsArrayObject` or `AsCollection` (and their encrypted variants) gets an array, because handing such a cast
+the text would store a JSON *string literal* instead of an object. `->asArray(false)` forces text. Outside a model (a
+custom page, a nested `->statePath()`) nothing is detected: pass `->asArray()` yourself.
+
+With `->asArray()` an empty object `{}` stays an object, integers beyond `PHP_INT_MAX` are stored as numeric strings
+(rather than losing digits to a float), and YAML timestamps stay strings (`released: 2024-01-01` is stored as
+`"2024-01-01"`, not as a unix integer).
 
 Both fields are ordinary Filament fields: `->required()`, `->disabled()` (read-only editor), `->live()`, `->columnSpanFull()`, ...
 work as usual.
 
 ### Validation
 
-The syntax rule is added automatically (`->validateSyntax(false)` turns it off; the in-browser lint stays). The rules are
+The syntax rule is added automatically (`->validateSyntax(false)` turns it off; the in-browser lint stays). With
+`->asArray()` the rule stays regardless: text that does not parse would otherwise be saved as `null` over the stored value. The rules are
 also usable on their own:
 
 ```php
@@ -112,6 +122,9 @@ $request->validate([
 `JsonSchemaRule` needs `opis/json-schema` or `justinrainbow/json-schema`; with neither installed it throws a
 `LogicException` instead of silently passing. Syntax errors are `JsonRule` / `YamlRule`'s job: the schema rule skips
 text it cannot parse. Client-side schema validation is deliberately not bundled (an engine would double the bundle).
+With `justinrainbow/json-schema` only `$ref`s to the bundled draft meta-schemas resolve; remote and `file://` references
+are refused (reported as a validation error) so that a schema coming from data cannot make the server fetch URLs or read
+files. `opis/json-schema` does not fetch unregistered URIs either.
 
 ### Infolist entries
 
@@ -134,12 +147,16 @@ translations section for the labels.
 
 ## Gotchas
 
-- **Tree view re-serialises.** Edits in the tree rewrite the document with `JSON.stringify`: integer-like keys (`"1"`, `"2"`)
-  are re-ordered by JavaScript, and numbers beyond 2^53 lose precision. The code view never touches the text.
+- **Tree view re-serialises on edit.** Editing a value, a key or a type in the tree rewrites the document with
+  `JSON.stringify`: integer-like keys (`"1"`, `"2"`) are re-ordered by JavaScript, and numbers beyond 2^53 lose precision.
+  Expanding and collapsing nodes is not an edit and leaves the text alone; so does the code view.
+- **YAML aliases are bounded.** A document whose aliases expand past a budget (1M nodes plus 10 per byte of source) fails
+  the syntax rule, so a "billion laughs" document cannot exhaust memory on save, schema validation or display.
 - **YAML comments.** They survive while the state stays text. `->asArray()` parses to an array, so comments are gone.
 - **YAML is parsed with no object flags.** `symfony/yaml` never instantiates PHP objects from `!php/object` tags here.
 - **JSON tree is JSON only.** `YamlEditor` has no tree view.
-- **`wire:ignore`.** The editor owns its DOM; a state change from the server (`$set`, `fill`) is pushed into it.
+- **`wire:ignore`.** The editor owns its DOM; a state change from the server (`$set`, `fill`) is pushed into it. An
+  array set that way is shown as text (JSON pretty-printed, YAML dumped by `js-yaml`).
 - **Run `php artisan filament:assets`** after install and after every update; the bundle is served from `public/js/asignua/`.
 
 ## Translations

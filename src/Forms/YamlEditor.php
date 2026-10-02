@@ -56,7 +56,9 @@ class YamlEditor extends Field implements HasEmbeddedView
             return $component->isArray() ? Yaml::decode($state) : $state;
         });
 
-        $this->rule(fn (): array => $this->shouldValidateSyntax() ? [YamlRule::make()] : []);
+        // With ->asArray() the syntax rule stays even after validateSyntax(false): invalid text
+        // would decode to null on save and overwrite the stored value without a word.
+        $this->rule(fn (): array => $this->shouldValidateSyntax() || $this->isArray() ? [YamlRule::make()] : []);
     }
 
     /**
@@ -105,6 +107,10 @@ class YamlEditor extends Field implements HasEmbeddedView
         return (int) $this->evaluate($this->dumpFlags);
     }
 
+    /**
+     * Turn the automatic "is valid YAML" rule off (the lint in the browser stays). Ignored
+     * with ->asArray(): text that does not parse cannot be stored as an array.
+     */
     public function validateSyntax(bool|Closure $condition = true): static
     {
         $this->validatesSyntax = $condition;

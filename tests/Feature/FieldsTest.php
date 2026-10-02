@@ -131,4 +131,79 @@ class FieldsTest extends TestCase
         $this->assertSame(4, $field->getIndent());
         $this->assertSame(0, $field->getDumpFlags());
     }
+
+    public function test_object_casts_open_as_yaml_and_round_trip(): void
+    {
+        $setting = $this->setting();
+        $setting->meta = collect(['tags' => ['a', 'b'], 'count' => 1]);
+        $setting->options = (object) ['debug' => true, 'level' => 'info'];
+        $setting->save();
+
+        $component = Livewire::test(EditSetting::class, ['record' => $setting->getKey()]);
+
+        $this->assertSame("tags:\n  - a\n  - b\ncount: 1\n", $component->get('data.meta'));
+        $this->assertSame("debug: true\nlevel: info\n", $component->get('data.options'));
+
+        $component->call('save')->assertHasNoFormErrors();
+        $setting->refresh();
+
+        $this->assertSame(['tags' => ['a', 'b'], 'count' => 1], $setting->meta?->all());
+        $this->assertEquals((object) ['debug' => true, 'level' => 'info'], $setting->options);
+    }
+
+    public function test_yaml_dates_stay_strings(): void
+    {
+        $setting = $this->setting();
+
+        $component = Livewire::test(EditSetting::class, ['record' => $setting->getKey()])
+            ->fillForm(['config_data' => "released: 2024-01-01\nat: 2024-01-01T10:30:00+02:00\n"])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame(['released' => '2024-01-01', 'at' => '2024-01-01T10:30:00+02:00'], $setting->refresh()->config_data);
+
+        $text = Livewire::test(EditSetting::class, ['record' => $setting->getKey()])->get('data.config_data');
+        $this->assertStringContainsString("released: '2024-01-01'", $text);
+    }
+
+    public function test_an_array_cast_without_as_array_still_stores_an_array(): void
+    {
+        Livewire::test(CreateSetting::class)
+            ->fillForm(['extras' => '{"a": 1}', 'meta' => "x: 1\n"])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $setting = Setting::query()->firstOrFail();
+
+        $this->assertSame(['a' => 1], $setting->extras);
+        $this->assertSame('{"a":1}', $setting->getRawOriginal('extras'));
+        $this->assertSame(['x' => 1], $setting->meta?->all());
+
+        $this->assertFalse(JsonEditor::make('x')->isArray());
+        $this->assertFalse(JsonEditor::make('x')->asArray(false)->isArray());
+    }
+
+    public function test_as_array_keeps_the_syntax_rule_after_validate_syntax_false(): void
+    {
+        $setting = $this->setting();
+        $setting->strict = ['keep' => 1];
+        $setting->save();
+
+        Livewire::test(EditSetting::class, ['record' => $setting->getKey()])
+            ->fillForm(['strict' => '{"broken": '])
+            ->call('save')
+            ->assertHasFormErrors(['strict']);
+
+        $this->assertSame(['keep' => 1], $setting->refresh()->strict);
+    }
+
+    public function test_as_array_keeps_empty_objects(): void
+    {
+        Livewire::test(CreateSetting::class)
+            ->fillForm(['settings' => '{"a": {}, "b": []}'])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('{"a":{},"b":[]}', Setting::query()->firstOrFail()->getRawOriginal('settings'));
+    }
 }

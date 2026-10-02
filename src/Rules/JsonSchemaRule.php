@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace Asignua\FilamentJsonYamlEditor\Rules;
 
 use Asignua\FilamentJsonYamlEditor\Support\Json;
+use Asignua\FilamentJsonYamlEditor\Support\LocalSchemaRetriever;
+use Asignua\FilamentJsonYamlEditor\Support\Yaml;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use JsonException;
+use JsonSchema\Constraints\Factory as JustinRainbowFactory;
+use JsonSchema\Exception\ResourceNotFoundException;
 use JsonSchema\Validator as JustinRainbowValidator;
 use LogicException;
 use Opis\JsonSchema\Errors\ErrorFormatter;
@@ -16,7 +20,7 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml as SymfonyYaml;
 
 /**
- * Validates a JSON (or, with {@see yaml()}, YAML) document against a JSON Schema on the
+ * Validates a JSON (or, with {@see Yaml()}, YAML) document against a JSON Schema on the
  * server. The engine is optional: `opis/json-schema` (draft 2020-12) is preferred, then
  * `justinrainbow/json-schema`. Neither installed: a {@see LogicException}, never a silent pass.
  *
@@ -134,8 +138,15 @@ class JsonSchemaRule implements ValidationRule
      */
     protected function justinrainbow(mixed $data): array
     {
-        $validator = new JustinRainbowValidator;
-        $validator->validate($data, $this->schemaObject());
+        // Its default retriever fetches remote and file:// `$ref`s; only the bundled
+        // meta-schemas are allowed here (opis does not fetch unregistered URIs either).
+        $validator = new JustinRainbowValidator(new JustinRainbowFactory(null, new LocalSchemaRetriever));
+
+        try {
+            $validator->validate($data, $this->schemaObject());
+        } catch (ResourceNotFoundException $exception) {
+            return [$exception->getMessage()];
+        }
 
         if ($validator->isValid()) {
             return [];
@@ -177,7 +188,9 @@ class JsonSchemaRule implements ValidationRule
         }
 
         if ($this->yaml) {
-            return SymfonyYaml::parse($value, SymfonyYaml::PARSE_OBJECT_FOR_MAP);
+            // Dates stay ISO strings (a `format: date` schema must accept `2024-01-01`), and the
+            // alias expansion guard applies before an engine walks the document.
+            return Yaml::parse($value, SymfonyYaml::PARSE_OBJECT_FOR_MAP);
         }
 
         [$valid] = Json::check($value);
