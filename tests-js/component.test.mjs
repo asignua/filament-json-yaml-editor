@@ -32,12 +32,29 @@ const labels = {
     },
 }
 
+// The shape Livewire 4's `$entangle()` gives the factory: an Alpine interceptor, not the value.
+function entangled(initialValue) {
+    return {
+        initialValue,
+        _x_interceptor: true,
+        initialize(data, path, key) {
+            return initialValue
+        },
+    }
+}
+
 function make(language, state, extra = {}) {
     const component = factory({
         language, modes: language === 'json' ? ['code', 'tree'] : ['code'], mode: 'code', isDisabled: false,
         isLive: false, isLiveDebounced: false, isLiveOnBlur: false, label: 'x', liveDebounce: 0, canWrap: false,
-        indent: 2, labels, state, ...extra,
+        indent: 2, labels, state: entangled(state), ...extra,
     })
+    // What Alpine does with interceptors in data before init(): `$wire.$entangle()` returns one.
+    for (const [key, value] of Object.entries(component)) {
+        if (value && typeof value === 'object' && value._x_interceptor) {
+            component[key] = value.initialize(component, key, key)
+        }
+    }
     component.$refs = { editor: w.document.getElementById('editor'), tree: w.document.getElementById('tree') }
     component.commits = 0
     component.$wire = { $commit: () => component.commits++ }
@@ -178,5 +195,23 @@ test('an array pushed by the server ($set) is shown as text', () => {
     yaml.watchers.state()
     yaml.watchers.state()
     assert.equal(yaml.editor.state.doc.toString(), 'server:\n  host: x\n')
+    yaml.destroy()
+})
+
+test('the $entangle interceptor reaches Alpine untouched and the editor shows its value', () => {
+    const interceptor = entangled('a: 1\n')
+    const component = factory({
+        language: 'yaml', modes: ['code'], mode: 'code', isDisabled: false, isLive: false, isLiveDebounced: false,
+        isLiveOnBlur: false, label: 'x', liveDebounce: 0, canWrap: false, indent: 2, labels, state: interceptor,
+    })
+    assert.equal(component.state, interceptor)
+
+    const json = make('json', '{"a": 1}')
+    assert.equal(json.editor.state.doc.toString(), '{"a": 1}')
+    assert.equal(json.state, '{"a": 1}')
+    json.destroy()
+
+    const yaml = make('yaml', 'a: 1\n')
+    assert.equal(yaml.editor.state.doc.toString(), 'a: 1\n')
     yaml.destroy()
 })

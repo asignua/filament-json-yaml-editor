@@ -29,7 +29,9 @@ export default function jsonYamlEditorFormComponent({
     state,
 }) {
     return {
-        state: stateToText(state, language, indent),
+        // The `$entangle` interceptor itself: Alpine resolves it only when it finds it as a data
+        // property, so it must not be converted here (see init()).
+        state,
         editor: null,
         view: mode,
         error: null,
@@ -45,6 +47,11 @@ export default function jsonYamlEditorFormComponent({
 
         init() {
             const debouncedCommit = Alpine.debounce(() => this.$wire.$commit(), liveDebounce ?? 300)
+
+            // Entangled by now. Null, or an array from the server: CodeMirror only takes text.
+            if (typeof this.state !== 'string') {
+                this.state = stateToText(this.state, language, indent)
+            }
 
             this.editor = new EditorView({
                 parent: this.$refs.editor,
