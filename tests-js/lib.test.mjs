@@ -89,3 +89,17 @@ test('jsonErrorOffset agrees with JSON.parse', async () => {
         assert.throws(() => JSON.parse(bad), bad)
     }
 })
+
+test('renameKey and addChild look at own keys only, and keep an own __proto__ key', () => {
+    const root = { a: 1 }
+    assert.equal(renameKey(root, ['a'], 'constructor'), true)
+    assert.deepEqual(Object.keys(root), ['constructor'])
+
+    const parsed = JSON.parse('{"__proto__": {"x": 1}, "b": 2}')
+    assert.equal(renameKey(parsed, ['b'], 'c'), true)
+    assert.equal(JSON.stringify(parsed), '{"__proto__":{"x":1},"c":2}')
+    assert.equal(Object.getPrototypeOf(parsed), Object.prototype)
+
+    const node = {}
+    assert.equal(addChild(node, []), 'key')
+})

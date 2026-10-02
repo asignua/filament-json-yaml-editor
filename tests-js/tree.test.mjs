@@ -110,7 +110,7 @@ test('a renamed row keeps working without a redraw (focus moves on to the next f
         container, root, readOnly: false, labels, expanded: new Set(), onChange: (next, rerender) => flags.push(rerender),
     })
 
-    container.querySelectorAll('.jye-toggle')[1].click() // expands via onChange -> no redraw in this harness, so expand manually
+    container.querySelectorAll('.jye-toggle')[1].click() // expanding redraws on its own, without onChange
     const expanded = new Set([JSON.stringify(['a'])])
     renderTree({ container, root, readOnly: false, labels, expanded, onChange: (next, rerender) => flags.push(rerender) })
 
@@ -122,4 +122,15 @@ test('a renamed row keeps working without a redraw (focus moves on to the next f
     assert.deepEqual(root, { renamed: { inner: 5 } })
     assert.deepEqual(flags.slice(-3), [false, false, false])
     assert.deepEqual([...expanded], [JSON.stringify(['renamed'])])
+})
+
+test('expanding and collapsing redraws without reporting a change', () => {
+    const { container, state } = mount({ a: { b: 1 } })
+
+    container.querySelectorAll('.jye-toggle')[1].click()
+    assert.equal(container.querySelectorAll('.jye-key').length, 2)
+    container.querySelectorAll('.jye-toggle')[1].click()
+    assert.equal(container.querySelectorAll('.jye-key').length, 1)
+
+    assert.deepEqual(state.changes, [])
 })

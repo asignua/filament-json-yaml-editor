@@ -1,4 +1,4 @@
-import { load } from 'js-yaml'
+import { dump, load } from 'js-yaml'
 
 /**
  * Pure helpers shared by the editor component and the tree view.
@@ -269,14 +269,16 @@ export function renameKey(root, path, newKey) {
     const parent = getAt(root, path.slice(0, -1))
     const oldKey = path[path.length - 1]
 
-    if (Array.isArray(parent) || newKey === '' || (newKey !== oldKey && newKey in parent)) {
+    // Own keys only: `in` also sees Object.prototype (`constructor`, `toString`...).
+    if (Array.isArray(parent) || newKey === '' || (newKey !== oldKey && Object.hasOwn(parent, newKey))) {
         return false
     }
 
     const entries = Object.entries(parent).map(([key, value]) => [key === oldKey ? newKey : key, value])
 
     Object.keys(parent).forEach((key) => delete parent[key])
-    entries.forEach(([key, value]) => (parent[key] = value))
+    // defineProperty: a plain `parent['__proto__'] = value` would set the prototype, not a key.
+    entries.forEach(([key, value]) => Object.defineProperty(parent, key, { value, writable: true, enumerable: true, configurable: true }))
 
     return true
 }
@@ -294,7 +296,7 @@ export function addChild(root, path, type = 'string') {
     let key = 'key'
     let counter = 1
 
-    while (key in node) {
+    while (Object.hasOwn(node, key)) {
         key = `key${++counter}`
     }
 
@@ -305,4 +307,20 @@ export function addChild(root, path, type = 'string') {
 
 export function changeType(root, path, type) {
     return setAt(root, path, defaultFor(type))
+}
+
+/**
+ * State the server pushed as a structure (`$set('field', [...])` skips the PHP hydration
+ * that turns arrays into text) as text for the editor. Strings pass through.
+ */
+export function stateToText(state, language, indent = 2) {
+    if (state === undefined || state === null) {
+        return ''
+    }
+
+    if (typeof state === 'string') {
+        return state
+    }
+
+    return language === 'yaml' ? dump(state, { indent }) : JSON.stringify(state, null, indent)
 }

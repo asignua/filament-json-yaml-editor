@@ -24,8 +24,9 @@ function el(tag, attributes = {}, children = []) {
 
 /**
  * Renders an editable tree into `container`. The model is a plain JS value that is
- * mutated in place; `onChange(root)` is called after every edit. `expanded` is a Set of
- * serialised paths that survives re-rendering.
+ * mutated in place; `onChange(root)` is called after every edit (and never on expand /
+ * collapse, which only redraws). `expanded` is a Set of serialised paths that survives
+ * re-rendering.
  */
 export function renderTree({ container, root, readOnly, labels, expanded, onChange }) {
     // `rerender: false` is for edits that already show in the DOM (typing in a value, ticking a checkbox).
@@ -131,9 +132,10 @@ export function renderTree({ container, root, readOnly, labels, expanded, onChan
                     'aria-expanded': String(open),
                     'aria-label': open ? labels.collapse : labels.expand,
                     text: open ? '▾' : '▸',
+                    // Expanding is not an edit: redraw only, never re-serialise the document or commit.
                     onclick: () => {
                         open ? expanded.delete(key(path)) : expanded.add(key(path))
-                        commit(root)
+                        renderTree({ container, root, readOnly, labels, expanded, onChange })
                     },
                 }),
             )

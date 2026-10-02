@@ -6,7 +6,7 @@ import { json } from '@codemirror/lang-json'
 import { yaml } from '@codemirror/lang-yaml'
 import { linter, lintGutter } from '@codemirror/lint'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { formatJson, isBlank, parseJson, parseYaml } from './lib.js'
+import { formatJson, isBlank, parseJson, parseYaml, stateToText } from './lib.js'
 import { renderTree } from './tree.js'
 
 /**
@@ -29,7 +29,7 @@ export default function jsonYamlEditorFormComponent({
     state,
 }) {
     return {
-        state,
+        state: stateToText(state, language, indent),
         editor: null,
         view: mode,
         error: null,
@@ -86,8 +86,12 @@ export default function jsonYamlEditorFormComponent({
 
             // The server (or another tab of the page) replaced the state.
             this.$watch('state', () => {
-                if (this.state === undefined || this.state === null) {
-                    this.state = ''
+                // Null, or an array from `$set()` / `fill()`: CodeMirror only takes text. Assigning
+                // re-runs this watcher with the string.
+                if (typeof this.state !== 'string') {
+                    this.state = stateToText(this.state, language, indent)
+
+                    return
                 }
 
                 if (this.editor.state.doc.toString() !== this.state) {
@@ -104,6 +108,14 @@ export default function jsonYamlEditorFormComponent({
                 this.editor.dispatch({ effects: this.themeCompartment.reconfigure(this.themeExtensions()) })
             })
             this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+
+            // Tree edits go through the editor's update listener (live / debounced); on-blur fields
+            // commit when the focus leaves a tree control, as they do when it leaves the code view.
+            this.$refs.tree?.addEventListener('focusout', () => {
+                if (isLiveOnBlur && this.isDocChanged) {
+                    this.$wire.$commit()
+                }
+            })
 
             if (this.view === 'tree') {
                 this.$nextTick(() => this.renderTreeView())
@@ -222,11 +234,8 @@ export default function jsonYamlEditorFormComponent({
                     const text = JSON.stringify(root, null, indent)
 
                     this.treeText = text
+                    // The update listener commits live / debounced fields; no second request here.
                     this.replaceDoc(text)
-
-                    if (isLive || isLiveDebounced) {
-                        this.$wire.$commit()
-                    }
 
                     if (rerender) {
                         this.renderTreeView()

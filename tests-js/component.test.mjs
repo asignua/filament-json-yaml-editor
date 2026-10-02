@@ -39,7 +39,8 @@ function make(language, state, extra = {}) {
         indent: 2, labels, state, ...extra,
     })
     component.$refs = { editor: w.document.getElementById('editor'), tree: w.document.getElementById('tree') }
-    component.$wire = { $commit() {} }
+    component.commits = 0
+    component.$wire = { $commit: () => component.commits++ }
     component.watchers = {}
     component.$watch = (key, callback) => (component.watchers[key] = callback)
     component.$nextTick = (fn) => fn()
@@ -118,4 +119,64 @@ test('json: a tree edit is not redrawn by the state watcher (the redraw swallows
     c.watchers.state()
     assert.notEqual(w.document.querySelector('.jye-value'), input)
     c.destroy()
+})
+
+test('json: expanding a tree node leaves the text alone and sends nothing', () => {
+    const text = '{"a":{"b":1.0},"big":12345678901234567890}'
+    const c = make('json', text, { isLive: true })
+
+    c.setView('tree')
+    w.document.querySelectorAll('.jye-toggle')[1].click()
+    assert.equal(w.document.querySelectorAll('.jye-key').length, 3)
+    w.document.querySelectorAll('.jye-toggle')[1].click()
+
+    assert.equal(c.editor.state.doc.toString(), text)
+    assert.equal(c.state, text)
+    assert.equal(c.isDocChanged, false)
+    assert.equal(c.commits, 0)
+    c.destroy()
+})
+
+test('json: a tree edit on a live field commits once', () => {
+    const c = make('json', '{"a": 1}', { isLive: true })
+
+    c.setView('tree')
+    const value = w.document.querySelector('.jye-value')
+    value.value = '2'
+    value.dispatchEvent(new w.Event('change'))
+
+    assert.equal(c.commits, 1)
+    c.destroy()
+})
+
+test('json: a tree edit on an on-blur field commits when the focus leaves', () => {
+    const c = make('json', '{"a": 1}', { isLive: true, isLiveOnBlur: true })
+
+    c.setView('tree')
+    const value = w.document.querySelector('.jye-value')
+    value.value = '2'
+    value.dispatchEvent(new w.Event('change'))
+    assert.equal(c.commits, 0)
+
+    value.dispatchEvent(new w.FocusEvent('focusout', { bubbles: true }))
+    assert.equal(c.commits, 1)
+    c.destroy()
+})
+
+test('an array pushed by the server ($set) is shown as text', () => {
+    const json = make('json', { a: [1] })
+    assert.equal(json.editor.state.doc.toString(), '{\n  "a": [\n    1\n  ]\n}')
+
+    json.state = { b: 2 }
+    json.watchers.state()
+    json.watchers.state()
+    assert.equal(json.editor.state.doc.toString(), '{\n  "b": 2\n}')
+    json.destroy()
+
+    const yaml = make('yaml', null)
+    yaml.state = { server: { host: 'x' } }
+    yaml.watchers.state()
+    yaml.watchers.state()
+    assert.equal(yaml.editor.state.doc.toString(), 'server:\n  host: x\n')
+    yaml.destroy()
 })
