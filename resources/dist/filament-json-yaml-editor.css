@@ -1,0 +1,261 @@
+/* Filament JSON / YAML editor. Plain CSS on Filament's own colour variables: no utilities, no build step. */
+
+.jye {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.jye-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.jye-modes {
+    display: inline-flex;
+    gap: 0.25rem;
+}
+
+.jye-active {
+    background-color: var(--primary-50);
+    color: var(--primary-600);
+}
+
+.dark .jye-active {
+    background-color: color-mix(in oklab, var(--primary-400) 15%, transparent);
+    color: var(--primary-400);
+}
+
+.jye-body {
+    min-height: 6rem;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--gray-950) 10%, transparent);
+}
+
+.dark .jye-body {
+    box-shadow: 0 0 0 1px color-mix(in oklab, white 20%, transparent);
+}
+
+.jye-code,
+.jye-code .cm-editor {
+    height: 100%;
+}
+
+.jye-code .cm-scroller {
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.875rem;
+}
+
+.jye-code .cm-editor.cm-focused {
+    outline: 2px solid var(--primary-600);
+    outline-offset: -2px;
+}
+
+.dark .jye-code .cm-editor.cm-focused {
+    outline-color: var(--primary-500);
+}
+
+.jye-status {
+    font-size: 0.875rem;
+    color: var(--danger-600);
+}
+
+.dark .jye-status {
+    color: var(--danger-400);
+}
+
+/* Tree view */
+
+.jye-tree-wrap {
+    height: 100%;
+    overflow: auto;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    background-color: white;
+}
+
+.dark .jye-tree-wrap {
+    background-color: var(--gray-900);
+}
+
+.jye-tree-invalid {
+    color: var(--danger-600);
+}
+
+.dark .jye-tree-invalid {
+    color: var(--danger-400);
+}
+
+.jye-tree,
+.jye-children {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.jye-children {
+    margin-inline-start: 1rem;
+    padding-inline-start: 0.5rem;
+    border-inline-start: 1px solid var(--gray-200);
+}
+
+.dark .jye-children {
+    border-inline-start-color: var(--gray-700);
+}
+
+.jye-row {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding-block: 0.125rem;
+}
+
+.jye-toggle {
+    width: 1.25rem;
+    flex: none;
+    cursor: pointer;
+    color: var(--gray-500);
+    text-align: center;
+}
+
+.jye-toggle--empty {
+    cursor: default;
+}
+
+.jye-index {
+    min-width: 1.25rem;
+    color: var(--gray-500);
+}
+
+.jye-key,
+.jye-value,
+.jye-type {
+    min-width: 0;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.375rem;
+    border: 1px solid transparent;
+    background-color: transparent;
+    color: var(--gray-950);
+}
+
+.dark .jye-key,
+.dark .jye-value,
+.dark .jye-type {
+    color: white;
+}
+
+.jye-key {
+    width: 9rem;
+    font-weight: 600;
+    color: var(--primary-700);
+}
+
+.dark .jye-key {
+    color: var(--primary-300);
+}
+
+.jye-value {
+    flex: 1 1 8rem;
+}
+
+.jye-number {
+    color: var(--info-700, var(--primary-700));
+}
+
+.jye-key:hover,
+.jye-value:hover,
+.jye-type:hover,
+.jye-key:focus,
+.jye-value:focus,
+.jye-type:focus {
+    border-color: var(--gray-300);
+    outline: none;
+}
+
+.dark .jye-key:hover,
+.dark .jye-value:hover,
+.dark .jye-type:hover,
+.dark .jye-key:focus,
+.dark .jye-value:focus,
+.dark .jye-type:focus {
+    border-color: var(--gray-600);
+}
+
+.jye-type {
+    margin-inline-start: auto;
+    color: var(--gray-500);
+    font-size: 0.75rem;
+}
+
+.dark .jye-type option {
+    background-color: var(--gray-900);
+}
+
+.jye-null,
+.jye-summary {
+    color: var(--gray-500);
+}
+
+.jye-action {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: none;
+    cursor: pointer;
+    border-radius: 0.375rem;
+    color: var(--gray-500);
+}
+
+.jye-action:hover {
+    background-color: var(--gray-100);
+    color: var(--primary-600);
+}
+
+.jye-action--danger:hover {
+    color: var(--danger-600);
+}
+
+.dark .jye-action:hover {
+    background-color: color-mix(in oklab, white 10%, transparent);
+}
+
+/* Infolist entries */
+
+.fi-in-jye-code {
+    position: relative;
+}
+
+.fi-in-jye-code > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: var(--gray-500);
+}
+
+.fi-in-jye-code .jye-copy {
+    cursor: pointer;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--gray-600);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--gray-950) 10%, transparent);
+}
+
+.dark .fi-in-jye-code .jye-copy {
+    color: var(--gray-300);
+    box-shadow: 0 0 0 1px color-mix(in oklab, white 20%, transparent);
+}
+
+.fi-in-jye-code .phiki {
+    overflow: auto;
+    max-height: var(--jye-max-height, none);
+    margin: 0;
+}
