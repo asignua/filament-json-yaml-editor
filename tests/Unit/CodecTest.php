@@ -128,4 +128,13 @@ class CodecTest extends TestCase
         );
         $this->assertSame(['d' => '2024-03-05'], Yaml::decode('d: 2024-03-05'));
     }
+
+    public function test_a_plain_date_stays_a_date_when_the_same_day_appears_with_a_time_elsewhere(): void
+    {
+        $this->assertSame(
+            ['q' => '2024-01-01T00:00:00Z', 'd' => '2024-01-01', 'l' => ['2024-01-01', '2024-01-01T00:00:00+00:00']],
+            Yaml::decode("q: '2024-01-01T00:00:00Z'\nd: 2024-01-01 # was 2024-01-01 00:00:00\nl: [2024-01-01, 2024-01-01 00:00:00]\n"),
+        );
+        $this->assertSame(['d' => '2024-01-01'], Yaml::datesToStrings(Yaml::parse('d: 2024-01-01', SymfonyYaml::PARSE_DATETIME), "d: 2024-01-01\n# 2024-01-01T00:00:00Z"));
+    }
 }

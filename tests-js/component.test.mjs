@@ -215,3 +215,57 @@ test('the $entangle interceptor reaches Alpine untouched and the editor shows it
     assert.equal(yaml.editor.state.doc.toString(), 'a: 1\n')
     yaml.destroy()
 })
+
+test('an empty editor leaves the state alone on load (no dirty form, no request)', () => {
+    for (const language of ['json', 'yaml']) {
+        let writes = 0
+        const component = factory({
+            language, modes: ['code'], mode: 'code', isDisabled: false, isLive: true, isLiveDebounced: false,
+            isLiveOnBlur: false, label: 'x', liveDebounce: 0, canWrap: false, indent: 2, labels, state: null,
+        })
+        let value = null
+        Object.defineProperty(component, 'state', {
+            get: () => value,
+            set: (next) => {
+                writes++
+                value = next
+            },
+        })
+        component.$refs = { editor: w.document.getElementById('editor'), tree: w.document.getElementById('tree') }
+        component.commits = 0
+        component.$wire = { $commit: () => component.commits++ }
+        component.watchers = {}
+        component.$watch = (key, callback) => (component.watchers[key] = callback)
+        component.$nextTick = (fn) => fn()
+        component.init()
+
+        assert.equal(component.editor.state.doc.toString(), '')
+        assert.equal(writes, 0)
+        assert.equal(component.state, null)
+        assert.equal(component.commits, 0)
+        component.destroy()
+    }
+})
+
+test('a state the server replaced is shown without being sent back', () => {
+    const c = make('json', '{"a": 1}', { isLive: true })
+
+    c.state = '{"b": 2}'
+    c.watchers.state()
+    assert.equal(c.editor.state.doc.toString(), '{"b": 2}')
+    assert.equal(c.commits, 0)
+    assert.equal(c.isDocChanged, false)
+
+    // a reset to null empties the editor and leaves the state null
+    c.state = null
+    c.watchers.state()
+    assert.equal(c.editor.state.doc.toString(), '')
+    assert.equal(c.state, null)
+    assert.equal(c.commits, 0)
+
+    // the user's own edits are still written and sent
+    c.replaceDoc('{"c": 3}')
+    assert.equal(c.state, '{"c": 3}')
+    assert.equal(c.commits, 1)
+    c.destroy()
+})

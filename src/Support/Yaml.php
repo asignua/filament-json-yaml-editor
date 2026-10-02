@@ -71,7 +71,7 @@ final class Yaml
 
         self::guardExpansion($value, self::EXPANSION_BUDGET + 10 * strlen($text));
 
-        return $keepDates ? $value : self::datesToStrings($value, $text);
+        return $keepDates ? $value : self::datesToStrings($value, $text, $flags);
     }
 
     public static function encode(mixed $value, int $inline = 10, int $indent = 2, int $flags = 0): string
@@ -112,33 +112,103 @@ final class Yaml
     /**
      * DateTime values (what `PARSE_DATETIME` produces) as ISO strings: a plain date as `Y-m-d`,
      * anything else with the time and offset. symfony parses `2024-01-01` and
-     * `2024-01-01T00:00:00Z` to the same value, so with the `$source` text a midnight UTC value
-     * is a plain date only when the source does not write that day as a midnight timestamp; without it,
-     * every midnight UTC value is taken for a plain date.
+     * `2024-01-01T00:00:00Z` to the same value; with the `$source` text a midnight UTC value
+     * keeps its time when that very scalar was written with one (see timeMarks()). Without
+     * it, every midnight UTC value is taken for a plain date.
      */
-    public static function datesToStrings(mixed $value, ?string $source = null): mixed
+    public static function datesToStrings(mixed $value, ?string $source = null, int $flags = 0): mixed
     {
-        if ($value instanceof DateTimeInterface) {
-            if ($value->format('H:i:s.u P') === '00:00:00.000000 +00:00') {
-                $pattern = sprintf('/(?<![\\d-])%s-0?%d-0?%d(?:[Tt]|[ \\t]+)0?0:00:00(?:\\.0*)?[ \\t]*(?:Z|[+-]0?0(?::?00)?)?(?![\\d.:])/', $value->format('Y'), (int) $value->format('n'), (int) $value->format('j'));
+        $marks = $source !== null && self::hasMidnight($value) ? self::timeMarks($source, $flags) : null;
 
-                if ($source === null || preg_match($pattern, $source) !== 1) {
-                    return $value->format('Y-m-d');
-                }
+        return self::convertDates($value, $marks);
+    }
 
-                return $value->format('Y-m-d\\TH:i:sP');
-            }
+    /**
+     * The source parsed again with a fraction of a second added to every timestamp that has a
+     * time. Text in comments and quoted strings changes too, but only the values at the
+     * positions of parsed dates are read, so a midnight date-time is told from a plain date
+     * by its own scalar, not by some other place in the text that looks the same.
+     */
+    private static function timeMarks(string $source, int $flags): mixed
+    {
+        $marked = preg_replace(
+            '/(?<![\\d-])(\\d{4}-\\d\\d?-\\d\\d?(?:[Tt]|[ \\t]+)\\d\\d?:\\d\\d:\\d\\d)(?:\\.\\d*)?/',
+            '$1.5',
+            $source,
+        );
 
-            return $value->format((int) $value->format('u') === 0 ? 'Y-m-d\TH:i:sP' : 'Y-m-d\TH:i:s.uP');
+        if (!is_string($marked)) {
+            return null;
         }
 
-        if (is_array($value)) {
-            return array_map(static fn (mixed $item): mixed => self::datesToStrings($item, $source), $value);
+        try {
+            // @phpstan-ignore argument.type
+            return SymfonyYaml::parse($marked, $flags | SymfonyYaml::PARSE_DATETIME);
+        } catch (ParseException) {
+            return null;
+        }
+    }
+
+    private static function hasMidnight(mixed $value): bool
+    {
+        if ($value instanceof DateTimeInterface) {
+            return self::isMidnightUtc($value);
         }
 
         if ($value instanceof stdClass) {
-            foreach (get_object_vars($value) as $key => $item) {
-                $value->{$key} = self::datesToStrings($item, $source);
+            $value = get_object_vars($value);
+        }
+
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if (self::hasMidnight($item)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function isMidnightUtc(DateTimeInterface $value): bool
+    {
+        return $value->format('H:i:s.u P') === '00:00:00.000000 +00:00';
+    }
+
+    /**
+     * @param mixed $marks the same document parsed by timeMarks(), walked in step with $value
+     */
+    private static function convertDates(mixed $value, mixed $marks): mixed
+    {
+        if ($value instanceof DateTimeInterface) {
+            if (self::isMidnightUtc($value)) {
+                $hadTime = $marks instanceof DateTimeInterface && (int) $marks->format('u') !== 0;
+
+                return $value->format($hadTime ? 'Y-m-d\\TH:i:sP' : 'Y-m-d');
+            }
+
+            return $value->format((int) $value->format('u') === 0 ? 'Y-m-d\\TH:i:sP' : 'Y-m-d\\TH:i:s.uP');
+        }
+
+        if (is_array($value)) {
+            $markList = is_array($marks) && count($marks) === count($value) ? array_values($marks) : [];
+            $index = 0;
+
+            foreach ($value as $key => $item) {
+                $value[$key] = self::convertDates($item, $markList[$index++] ?? null);
+            }
+
+            return $value;
+        }
+
+        if ($value instanceof stdClass) {
+            $markVars = $marks instanceof stdClass ? array_values(get_object_vars($marks)) : [];
+            $vars = get_object_vars($value);
+            $markVars = count($markVars) === count($vars) ? $markVars : [];
+            $index = 0;
+
+            foreach ($vars as $key => $item) {
+                $value->{$key} = self::convertDates($item, $markVars[$index++] ?? null);
             }
         }
 

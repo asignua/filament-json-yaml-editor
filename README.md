@@ -90,7 +90,8 @@ the model is always shown as text. Blank text is stored as `null`.
 
 Without an explicit `->asArray()` the field follows the model's cast: a column cast to `array`, `json`, `object`,
 `collection`, `AsArrayObject` or `AsCollection` (and their encrypted variants) gets an array, because handing such a cast
-the text would store a JSON *string literal* instead of an object. `->asArray(false)` forces text. Outside a model (a
+the text would store a JSON *string literal* instead of an object. `->asArray(false)` forces text (for a column without
+such a cast, or one whose cast takes text). Outside a model (a
 custom page, a nested `->statePath()`) nothing is detected: pass `->asArray()` yourself.
 
 With `->asArray()` an empty JSON object `{}` stays an object: it is stored as `{}`, and when the form is reopened the
@@ -101,8 +102,10 @@ stay strings (`released: 2024-01-01` is stored as `"2024-01-01"`, `at: 2024-01-0
 
 **Integers beyond `PHP_INT_MAX` change type with `->asArray()`.** PHP cannot hold them as numbers, so
 `{"id": 12345678901234567890}` is stored as `{"id": "12345678901234567890"}`: the digits are kept, but from then on the
-value is a string — the editor shows it quoted and a `->schema()` with `type: integer` rejects it. Keep such columns as
-text (no `->asArray()`, `->asArray(false)` on an array cast) if they must stay numbers. Translatable attributes
+value is a string — the editor shows it quoted and a `->schema()` with `type: integer` rejects it. If they must stay
+numbers, keep the column as text: remove the array / json cast from the model attribute and leave `->asArray()` off, so
+the text is stored as typed. Do not combine `->asArray(false)` with a column that keeps its array cast: the cast would
+encode the text again and store a JSON *string literal*. Translatable attributes
 (spatie/laravel-translatable) are never switched to an array automatically.
 
 Both fields are ordinary Filament fields: `->required()`, `->disabled()` (read-only editor), `->live()`, `->columnSpanFull()`, ...

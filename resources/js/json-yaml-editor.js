@@ -40,6 +40,7 @@ export default function jsonYamlEditorFormComponent({
         expanded: new Set(),
         themeCompartment: new Compartment(),
         isDocChanged: false,
+        isSyncingFromServer: false,
         treeText: null,
         modes,
         labels,
@@ -48,15 +49,17 @@ export default function jsonYamlEditorFormComponent({
         init() {
             const debouncedCommit = Alpine.debounce(() => this.$wire.$commit(), liveDebounce ?? 300)
 
-            // Entangled by now. Null, or an array from the server: CodeMirror only takes text.
-            if (typeof this.state !== 'string') {
+            // Entangled by now. An array from the server is converted into the state (CodeMirror
+            // only takes text); null is shown as an empty document and left alone: writing ''
+            // back would mark the form dirty and send a request for live fields on load.
+            if (this.state !== null && this.state !== undefined && typeof this.state !== 'string') {
                 this.state = stateToText(this.state, language, indent)
             }
 
             this.editor = new EditorView({
                 parent: this.$refs.editor,
                 state: EditorState.create({
-                    doc: this.state ?? '',
+                    doc: stateToText(this.state, language, indent),
                     extensions: [
                         basicSetup,
                         keymap.of([indentWithTab]),
@@ -68,7 +71,8 @@ export default function jsonYamlEditorFormComponent({
                         EditorState.readOnly.of(isDisabled),
                         EditorView.editable.of(!isDisabled),
                         EditorView.updateListener.of((update) => {
-                            if (!update.docChanged) {
+                            // The server's own state shown in the editor is not an edit to send back.
+                            if (!update.docChanged || this.isSyncingFromServer) {
                                 return
                             }
 
@@ -93,20 +97,28 @@ export default function jsonYamlEditorFormComponent({
 
             // The server (or another tab of the page) replaced the state.
             this.$watch('state', () => {
-                // Null, or an array from `$set()` / `fill()`: CodeMirror only takes text. Assigning
-                // re-runs this watcher with the string.
-                if (typeof this.state !== 'string') {
+                // An array from `$set()` / `fill()`: CodeMirror only takes text. Assigning re-runs
+                // this watcher with the string. Null is shown as an empty document.
+                if (this.state !== null && this.state !== undefined && typeof this.state !== 'string') {
                     this.state = stateToText(this.state, language, indent)
 
                     return
                 }
 
-                if (this.editor.state.doc.toString() !== this.state) {
-                    this.replaceDoc(this.state)
+                const text = stateToText(this.state, language, indent)
+
+                if (this.editor.state.doc.toString() !== text) {
+                    this.isSyncingFromServer = true
+
+                    try {
+                        this.replaceDoc(text)
+                    } finally {
+                        this.isSyncingFromServer = false
+                    }
                 }
 
                 // The tree itself wrote this text and draws (or deliberately does not draw) its own result.
-                if (this.view === 'tree' && this.state !== this.treeText) {
+                if (this.view === 'tree' && text !== this.treeText) {
                     this.renderTreeView()
                 }
             })

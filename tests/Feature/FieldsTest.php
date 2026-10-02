@@ -233,6 +233,25 @@ class FieldsTest extends TestCase
         $this->assertStringContainsString('"id": 12345678901234567890', Livewire::test(EditSetting::class, ['record' => $setting->getKey()])->get('data.settings'));
     }
 
+    public function test_data_the_page_fills_in_wins_over_the_stored_column(): void
+    {
+        $setting = $this->setting();
+
+        EditSetting::$mutateBeforeFill = static fn (array $data): array => [...$data, 'settings' => ['b' => 2]];
+
+        try {
+            $component = Livewire::test(EditSetting::class, ['record' => $setting->getKey()]);
+        } finally {
+            EditSetting::$mutateBeforeFill = null;
+        }
+
+        $this->assertSame("{\n  \"b\": 2\n}", $component->get('data.settings'));
+
+        // fill() with custom data on a page bound to the same record.
+        $component->instance()->form->fill(['settings' => ['c' => 3]]);
+        $this->assertSame("{\n  \"c\": 3\n}", $component->instance()->data['settings']);
+    }
+
     public function test_translatable_attributes_are_not_taken_for_array_casts(): void
     {
         $model = new class extends Setting

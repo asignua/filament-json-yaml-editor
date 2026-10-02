@@ -9,6 +9,7 @@ use Asignua\FilamentJsonYamlEditor\Enums\EditorMode;
 use Asignua\FilamentJsonYamlEditor\Rules\JsonRule;
 use Asignua\FilamentJsonYamlEditor\Rules\JsonSchemaRule;
 use Asignua\FilamentJsonYamlEditor\Support\Json;
+use Asignua\FilamentJsonYamlEditor\Support\Yaml;
 use Closure;
 use Filament\Forms\Components\Field;
 use Filament\Support\Components\Contracts\HasEmbeddedView;
@@ -48,7 +49,7 @@ class JsonEditor extends Field implements HasEmbeddedView
                 return;
             }
 
-            $component->state($component->rawColumnText() ?? Json::encode($state, $component->getIndent()));
+            $component->state($component->rawColumnText($state) ?? Json::encode($state, $component->getIndent()));
         });
 
         $this->dehydrateStateUsing(function (JsonEditor $component, mixed $state): mixed {
@@ -74,8 +75,12 @@ class JsonEditor extends Field implements HasEmbeddedView
      * The stored JSON of an unchanged record attribute with a JSON cast, re-indented. The cast
      * decodes to arrays, which turns `{}` into `[]` (and big integers into floats): showing
      * that would change the value on the next save.
+     *
+     * Only when the hydrated state is what the cast makes of that column: a page that filled
+     * the form with its own data (mutateFormDataBeforeFill(), an action's fillForm(), fill()
+     * with custom data) gets its own state shown, not the stored column.
      */
-    protected function rawColumnText(): ?string
+    protected function rawColumnText(mixed $state): ?string
     {
         if (!$this->modelCastsToArray()) {
             return null;
@@ -92,6 +97,12 @@ class JsonEditor extends Field implements HasEmbeddedView
 
         // Encrypted casts store ciphertext: that is not JSON, and the array is used instead.
         if (!is_string($raw) || trim($raw) === '' || !Json::check($raw)[0]) {
+            return null;
+        }
+
+        // The casts decode with json_decode() defaults, so the same column gives the same
+        // scalars (big integers as the same floats); objects are compared as arrays.
+        if (json_decode($raw, true) !== Yaml::normalize($state)) {
             return null;
         }
 
