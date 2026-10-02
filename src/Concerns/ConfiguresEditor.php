@@ -80,6 +80,12 @@ trait ConfiguresEditor
             return false;
         }
 
+        // spatie/laravel-translatable reports an `array` cast for every translatable attribute;
+        // an array handed to it would be taken for a locale map and overwrite the translations.
+        if (method_exists($model, 'isTranslatableAttribute') && $model->isTranslatableAttribute($name)) {
+            return false;
+        }
+
         $cast = $model->getCasts()[$name] ?? null;
 
         if (!is_string($cast)) {

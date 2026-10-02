@@ -31,7 +31,8 @@ final class Json
     /**
      * Decodes to arrays (or scalars). Blank text and invalid JSON give null. An empty object
      * `{}` stays an object (an empty stdClass), so it is stored as `{}`, not as `[]`; integers
-     * beyond PHP_INT_MAX come back as numeric strings instead of losing digits to a float.
+     * beyond PHP_INT_MAX come back as numeric strings instead of losing digits to a float (so
+     * their type changes: they are stored, shown and validated as strings from then on).
      */
     public static function decode(string $text): mixed
     {
@@ -58,6 +59,61 @@ final class Json
         }
 
         return is_array($value) ? array_map(self::toArrays(...), $value) : $value;
+    }
+
+    /**
+     * Re-indents valid JSON text the way encode() prints, without a decode / encode round trip:
+     * numbers are kept as written (`12345678901234567890` keeps its digits, `1.0` its fraction),
+     * `{}` stays an object. Strings are re-escaped like encode() does. Invalid JSON is returned
+     * as it is.
+     */
+    public static function reformat(string $text, int $indent = 2): string
+    {
+        if (!self::check($text)[0]) {
+            return $text;
+        }
+
+        $out = '';
+        $depth = 0;
+        $length = strlen($text);
+        $newline = static fn (int $depth): string => "\n".str_repeat(' ', $depth * max(1, $indent));
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $text[$i];
+
+            if ($char === '"') {
+                $end = $i + 1;
+
+                while ($text[$end] !== '"') {
+                    $end += $text[$end] === '\\' ? 2 : 1;
+                }
+
+                $out .= (string) json_encode(
+                    json_decode(substr($text, $i, $end - $i + 1)),
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE,
+                );
+                $i = $end;
+            } elseif ($char === '{' || $char === '[') {
+                $next = $i + 1 + strspn($text, " \t\r\n", $i + 1);
+
+                if ($text[$next] === ($char === '{' ? '}' : ']')) {
+                    $out .= $char.$text[$next];
+                    $i = $next;
+                } else {
+                    $out .= $char.$newline(++$depth);
+                }
+            } elseif ($char === '}' || $char === ']') {
+                $out .= $newline(--$depth).$char;
+            } elseif ($char === ',') {
+                $out .= ','.$newline($depth);
+            } elseif ($char === ':') {
+                $out .= ': ';
+            } elseif (!in_array($char, [' ', "\t", "\r", "\n"], true)) {
+                $out .= $char;
+            }
+        }
+
+        return $out;
     }
 
     /**

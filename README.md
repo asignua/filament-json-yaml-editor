@@ -93,9 +93,17 @@ Without an explicit `->asArray()` the field follows the model's cast: a column c
 the text would store a JSON *string literal* instead of an object. `->asArray(false)` forces text. Outside a model (a
 custom page, a nested `->statePath()`) nothing is detected: pass `->asArray()` yourself.
 
-With `->asArray()` an empty object `{}` stays an object, integers beyond `PHP_INT_MAX` are stored as numeric strings
-(rather than losing digits to a float), and YAML timestamps stay strings (`released: 2024-01-01` is stored as
-`"2024-01-01"`, not as a unix integer).
+With `->asArray()` an empty JSON object `{}` stays an object: it is stored as `{}`, and when the form is reopened the
+text is built from the stored column, not from the cast's arrays (which would turn it into `[]`). This holds for the
+plain JSON casts; an encrypted cast stores ciphertext, so its `{}` is shown (and saved back) as `[]`. YAML timestamps
+stay strings (`released: 2024-01-01` is stored as `"2024-01-01"`, `at: 2024-01-01T00:00:00Z` as
+`"2024-01-01T00:00:00+00:00"`), not unix integers.
+
+**Integers beyond `PHP_INT_MAX` change type with `->asArray()`.** PHP cannot hold them as numbers, so
+`{"id": 12345678901234567890}` is stored as `{"id": "12345678901234567890"}`: the digits are kept, but from then on the
+value is a string — the editor shows it quoted and a `->schema()` with `type: integer` rejects it. Keep such columns as
+text (no `->asArray()`, `->asArray(false)` on an array cast) if they must stay numbers. Translatable attributes
+(spatie/laravel-translatable) are never switched to an array automatically.
 
 Both fields are ordinary Filament fields: `->required()`, `->disabled()` (read-only editor), `->live()`, `->columnSpanFull()`, ...
 work as usual.

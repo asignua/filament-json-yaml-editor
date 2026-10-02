@@ -13,6 +13,7 @@ use Closure;
 use Filament\Forms\Components\Field;
 use Filament\Support\Components\Contracts\HasEmbeddedView;
 use Filament\Support\Concerns\HasExtraAlpineAttributes;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * A JSON field with a code view (highlighting, line numbers, folding, live lint with the
@@ -47,7 +48,7 @@ class JsonEditor extends Field implements HasEmbeddedView
                 return;
             }
 
-            $component->state(Json::encode($state, $component->getIndent()));
+            $component->state($component->rawColumnText() ?? Json::encode($state, $component->getIndent()));
         });
 
         $this->dehydrateStateUsing(function (JsonEditor $component, mixed $state): mixed {
@@ -67,6 +68,34 @@ class JsonEditor extends Field implements HasEmbeddedView
         $this->rule(fn (): array => $this->shouldValidateSyntax() || $this->isArray()
             ? [JsonRule::make()->containerOnly((bool) $this->evaluate($this->onlyContainers))]
             : []);
+    }
+
+    /**
+     * The stored JSON of an unchanged record attribute with a JSON cast, re-indented. The cast
+     * decodes to arrays, which turns `{}` into `[]` (and big integers into floats): showing
+     * that would change the value on the next save.
+     */
+    protected function rawColumnText(): ?string
+    {
+        if (!$this->modelCastsToArray()) {
+            return null;
+        }
+
+        $record = $this->getRecord();
+        $name = $this->getName();
+
+        if (!$record instanceof Model || !$record->isClean($name)) {
+            return null;
+        }
+
+        $raw = $record->getRawOriginal($name);
+
+        // Encrypted casts store ciphertext: that is not JSON, and the array is used instead.
+        if (!is_string($raw) || trim($raw) === '' || !Json::check($raw)[0]) {
+            return null;
+        }
+
+        return Json::reformat($raw, $this->getIndent());
     }
 
     /**

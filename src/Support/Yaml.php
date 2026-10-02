@@ -71,7 +71,7 @@ final class Yaml
 
         self::guardExpansion($value, self::EXPANSION_BUDGET + 10 * strlen($text));
 
-        return $keepDates ? $value : self::datesToStrings($value);
+        return $keepDates ? $value : self::datesToStrings($value, $text);
     }
 
     public static function encode(mixed $value, int $inline = 10, int $indent = 2, int $flags = 0): string
@@ -110,26 +110,35 @@ final class Yaml
     }
 
     /**
-     * DateTime values (what `PARSE_DATETIME` produces) as ISO strings: a date at midnight UTC
-     * as `Y-m-d`, anything else with the time and offset.
+     * DateTime values (what `PARSE_DATETIME` produces) as ISO strings: a plain date as `Y-m-d`,
+     * anything else with the time and offset. symfony parses `2024-01-01` and
+     * `2024-01-01T00:00:00Z` to the same value, so with the `$source` text a midnight UTC value
+     * is a plain date only when the source does not write that day as a midnight timestamp; without it,
+     * every midnight UTC value is taken for a plain date.
      */
-    public static function datesToStrings(mixed $value): mixed
+    public static function datesToStrings(mixed $value, ?string $source = null): mixed
     {
         if ($value instanceof DateTimeInterface) {
             if ($value->format('H:i:s.u P') === '00:00:00.000000 +00:00') {
-                return $value->format('Y-m-d');
+                $pattern = sprintf('/(?<![\\d-])%s-0?%d-0?%d(?:[Tt]|[ \\t]+)0?0:00:00(?:\\.0*)?[ \\t]*(?:Z|[+-]0?0(?::?00)?)?(?![\\d.:])/', $value->format('Y'), (int) $value->format('n'), (int) $value->format('j'));
+
+                if ($source === null || preg_match($pattern, $source) !== 1) {
+                    return $value->format('Y-m-d');
+                }
+
+                return $value->format('Y-m-d\\TH:i:sP');
             }
 
             return $value->format((int) $value->format('u') === 0 ? 'Y-m-d\TH:i:sP' : 'Y-m-d\TH:i:s.uP');
         }
 
         if (is_array($value)) {
-            return array_map(self::datesToStrings(...), $value);
+            return array_map(static fn (mixed $item): mixed => self::datesToStrings($item, $source), $value);
         }
 
         if ($value instanceof stdClass) {
             foreach (get_object_vars($value) as $key => $item) {
-                $value->{$key} = self::datesToStrings($item);
+                $value->{$key} = self::datesToStrings($item, $source);
             }
         }
 

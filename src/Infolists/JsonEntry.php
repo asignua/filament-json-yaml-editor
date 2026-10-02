@@ -28,10 +28,9 @@ class JsonEntry extends CodeBlockEntry
     protected function toText(mixed $state): string
     {
         if (is_string($state)) {
-            $decoded = json_decode($state);
-
-            // Valid JSON text is re-indented; anything else is shown as it is.
-            return json_last_error() === JSON_ERROR_NONE ? Json::encode($decoded) : $state;
+            // Valid JSON text is re-indented without changing a value (big integers keep their
+            // digits); anything else is shown as it is.
+            return Json::reformat($state);
         }
 
         return Json::encode($state);

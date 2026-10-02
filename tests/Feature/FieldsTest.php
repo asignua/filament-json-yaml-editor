@@ -7,9 +7,12 @@ namespace Asignua\FilamentJsonYamlEditor\Tests\Feature;
 use Asignua\FilamentJsonYamlEditor\Enums\EditorMode;
 use Asignua\FilamentJsonYamlEditor\Forms\JsonEditor;
 use Asignua\FilamentJsonYamlEditor\Forms\YamlEditor;
+use Asignua\FilamentJsonYamlEditor\Infolists\JsonEntry;
 use Asignua\FilamentJsonYamlEditor\Rules\JsonSchemaRule;
 use Asignua\FilamentJsonYamlEditor\Tests\TestCase;
+use Filament\Schemas\Schema;
 use Livewire\Livewire;
+use ReflectionMethod;
 use Workbench\App\Filament\Resources\Settings\Pages\CreateSetting;
 use Workbench\App\Filament\Resources\Settings\Pages\EditSetting;
 use Workbench\App\Models\Setting;
@@ -205,5 +208,57 @@ class FieldsTest extends TestCase
             ->assertHasNoFormErrors();
 
         $this->assertSame('{"a":{},"b":[]}', Setting::query()->firstOrFail()->getRawOriginal('settings'));
+    }
+
+    public function test_empty_objects_survive_reopening_an_array_cast(): void
+    {
+        Livewire::test(CreateSetting::class)
+            ->fillForm(['settings' => '{"a": {}, "b": [], "id": 12345678901234567890}'])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $setting = Setting::query()->firstOrFail();
+        $stored = '{"a":{},"b":[],"id":"12345678901234567890"}';
+        $this->assertSame($stored, $setting->getRawOriginal('settings'));
+
+        // Reopened, the text comes from the column, not from the cast's arrays.
+        $component = Livewire::test(EditSetting::class, ['record' => $setting->getKey()]);
+        $this->assertSame("{\n  \"a\": {},\n  \"b\": [],\n  \"id\": \"12345678901234567890\"\n}", $component->get('data.settings'));
+
+        $component->call('save')->assertHasNoFormErrors();
+        $this->assertSame($stored, $setting->refresh()->getRawOriginal('settings'));
+
+        // A big integer written by another system is shown with all its digits.
+        Setting::query()->whereKey($setting->getKey())->update(['settings' => '{"id":12345678901234567890}']);
+        $this->assertStringContainsString('"id": 12345678901234567890', Livewire::test(EditSetting::class, ['record' => $setting->getKey()])->get('data.settings'));
+    }
+
+    public function test_translatable_attributes_are_not_taken_for_array_casts(): void
+    {
+        $model = new class extends Setting
+        {
+            public function getCasts(): array
+            {
+                return [...parent::getCasts(), 'name' => 'array'];
+            }
+
+            public function isTranslatableAttribute(string $key): bool
+            {
+                return $key === 'name';
+            }
+        };
+
+        $field = JsonEditor::make('name')->container(Schema::make()->model($model));
+        $this->assertFalse($field->isArray());
+
+        $field = JsonEditor::make('extras')->container(Schema::make()->model($model));
+        $this->assertTrue($field->isArray());
+    }
+
+    public function test_the_json_entry_keeps_big_integers(): void
+    {
+        $text = (new ReflectionMethod(JsonEntry::class, 'toText'))->invoke(JsonEntry::make('x'), '{"id":12345678901234567890}');
+
+        $this->assertSame("{\n  \"id\": 12345678901234567890\n}", $text);
     }
 }

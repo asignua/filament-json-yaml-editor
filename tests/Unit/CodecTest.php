@@ -103,4 +103,29 @@ class CodecTest extends TestCase
         $this->assertStringContainsString('"name": "a', Json::encode(['name' => "a\xB1b"]));
         $this->assertNotSame('', Json::encode(['x' => INF]));
     }
+
+    public function test_json_reformat_keeps_values_as_written(): void
+    {
+        $text = '{"id":12345678901234567890,"f":1.0,"e":{},"l":[ ],"s":"При\/x \"q\"","n":[1,{"a":null}]}';
+
+        $this->assertSame(
+            "{\n  \"id\": 12345678901234567890,\n  \"f\": 1.0,\n  \"e\": {},\n  \"l\": [],\n  \"s\": \"При/x \\\"q\\\"\",\n  \"n\": [\n    1,\n    {\n      \"a\": null\n    }\n  ]\n}",
+            Json::reformat($text),
+        );
+
+        // Same output as encode() for values PHP holds without loss.
+        $data = ['title' => 'Привіт', 'url' => 'a/b', 'list' => [1, 2.0], 'empty' => [], 'nested' => ['x' => [true]]];
+        $this->assertSame(Json::encode($data, 4), Json::reformat((string) json_encode($data, JSON_PRESERVE_ZERO_FRACTION), 4));
+        $this->assertSame('{broken', Json::reformat('{broken'));
+        $this->assertSame('"a"', Json::reformat(' "a" '));
+    }
+
+    public function test_yaml_midnight_timestamps_keep_their_time(): void
+    {
+        $this->assertSame(
+            ['d' => '2024-01-01', 'h' => '2024-01-01T10:30:00+00:00', 't' => '2024-05-01T00:00:00+00:00', 'u' => '2024-02-03T00:00:00+00:00', 'z' => '2024-06-07T00:00:00+00:00'],
+            Yaml::decode("d: 2024-01-01\nh: 2024-01-01T10:30:00Z\nt: 2024-05-01T00:00:00Z\nu: 2024-2-3 00:00:00\nz: 2024-06-07t00:00:00.0+00:00\n"),
+        );
+        $this->assertSame(['d' => '2024-03-05'], Yaml::decode('d: 2024-03-05'));
+    }
 }

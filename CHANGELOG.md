@@ -13,6 +13,7 @@ All notable changes to `asignua/filament-json-yaml-editor` are documented here.
 - Translations: English, Ukrainian, German, Spanish, French, Italian, Dutch, Polish, Brazilian Portuguese and Turkish.
 - Laravel Boost guidelines.
 - Without `->asArray()` the fields follow the model cast (`array`, `json`, `object`, `collection`, `AsArrayObject`, `AsCollection`, encrypted variants) and hand it an array; `->asArray(false)` forces text.
-- With `->asArray()` the syntax rule stays on even after `->validateSyntax(false)`, YAML timestamps stay ISO strings, `{}` stays an object and big integers are kept as numeric strings.
+- With `->asArray()` the syntax rule stays on even after `->validateSyntax(false)`, YAML timestamps stay ISO strings (a midnight UTC timestamp keeps its time) and `{}` stays an object, also after the form is reopened (the text is built from the stored column). Integers beyond `PHP_INT_MAX` keep their digits but become strings; `JsonEntry` shows them unchanged.
+- Translatable attributes (spatie/laravel-translatable) are not taken for array casts.
 - Collections, `ArrayObject`s and plain objects are dumped as YAML maps (field and entry).
 - Security: YAML documents whose aliases expand past a budget are rejected ("billion laughs"); with `justinrainbow/json-schema`, `JsonSchemaRule` refuses remote and `file://` `$ref`s (only the bundled draft meta-schemas resolve).
