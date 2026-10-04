@@ -192,7 +192,7 @@ composer test            # PHPUnit (Orchestra Testbench + workbench panel)
 composer analyse         # PHPStan level 8
 composer format          # Pint
 npm ci && npm test       # node: pure JS logic, the tree view and a smoke test of the Alpine component (jsdom)
-npm run build            # rebuild resources/dist/json-yaml-editor.js with esbuild (commit the result)
+npm run build            # rebuild resources/dist/json-yaml-editor.js with esbuild (commit the result; CI fails when it differs)
 ```
 
 ## Changelog
