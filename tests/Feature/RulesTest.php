@@ -125,4 +125,12 @@ class RulesTest extends TestCase
         // The schema rule leaves it to the syntax rule instead of walking it.
         $this->assertSame([], $this->errors($yaml, JsonSchemaRule::make(['type' => 'object'])->yaml()));
     }
+
+    public function test_schema_rule_on_yaml_with_merge_keys_in_flow_maps(): void
+    {
+        $rule = JsonSchemaRule::make(['type' => 'object', 'properties' => ['item' => ['type' => 'object', 'required' => ['k', 'm']]]])->yaml();
+
+        $this->assertSame([], $this->errors("base: &a {k: 1}\nitem: {<<: *a, m: 2}\n", $rule));
+        $this->assertCount(1, $this->errors("base: &a {x: 1}\nitem: {<<: *a, m: 2}\n", $rule));
+    }
 }

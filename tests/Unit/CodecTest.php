@@ -147,4 +147,18 @@ class CodecTest extends TestCase
         $this->assertSame("a: {}\nb: []\n", Yaml::encode(['a' => new stdClass, 'b' => []], flags: SymfonyYaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE));
         $this->assertNull(Yaml::decodeToArrays('a: ['));
     }
+
+    public function test_yaml_decode_to_arrays_survives_merge_keys_in_flow_maps(): void
+    {
+        $expected = ['base' => ['k' => 1], 'item' => ['k' => 1, 'm' => 2]];
+
+        // symfony/yaml merges an object into an array here and throws a TypeError with
+        // PARSE_OBJECT_FOR_MAP; the text is valid, so it must decode like decode() does.
+        $this->assertSame($expected, Yaml::decodeToArrays("base: &a {k: 1}\nitem: {<<: *a, m: 2}\n"));
+        $this->assertSame($expected, Yaml::decodeToArrays("base: &a\n  k: 1\nitem: {<<: *a, m: 2}\n"));
+        $this->assertSame(
+            ['base' => ['at' => '2024-01-01T00:00:00+00:00'], 'item' => ['at' => '2024-01-01T00:00:00+00:00', 'on' => '2024-01-01']],
+            Yaml::decodeToArrays("base: &a {at: 2024-01-01T00:00:00Z}\nitem: {<<: *a, on: 2024-01-01}\n"),
+        );
+    }
 }

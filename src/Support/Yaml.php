@@ -10,7 +10,9 @@ use JsonSerializable;
 use stdClass;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml as SymfonyYaml;
+use Throwable;
 use Traversable;
+use TypeError;
 
 /**
  * YAML conversions shared by the editor field, the entry and the rules. Parsing never
@@ -76,8 +78,7 @@ final class Yaml
     {
         $keepDates = ($flags & SymfonyYaml::PARSE_DATETIME) !== 0;
 
-        // @phpstan-ignore argument.type
-        $value = SymfonyYaml::parse($text, $flags | SymfonyYaml::PARSE_DATETIME);
+        $value = self::symfonyParse($text, $flags | SymfonyYaml::PARSE_DATETIME);
 
         self::guardExpansion($value, self::EXPANSION_BUDGET + 10 * strlen($text));
 
@@ -168,11 +169,49 @@ final class Yaml
         }
 
         try {
-            // @phpstan-ignore argument.type
-            return SymfonyYaml::parse($marked, $flags | SymfonyYaml::PARSE_DATETIME);
+            return self::symfonyParse($marked, $flags | SymfonyYaml::PARSE_DATETIME);
         } catch (ParseException) {
             return null;
         }
+    }
+
+    /**
+     * symfony/yaml with `PARSE_OBJECT_FOR_MAP` crashes on a merge key inside a flow map
+     * (`item: {<<: *a, m: 2}`): it adds the aliased `stdClass` to an array and throws a
+     * TypeError, not a ParseException, although the text is valid YAML. Such a document is
+     * parsed again without the flag and its maps are turned into objects afterwards. Only an
+     * empty map is lost on that path: it comes back as an empty array.
+     *
+     * @throws ParseException
+     */
+    private static function symfonyParse(string $text, int $flags): mixed
+    {
+        try {
+            // @phpstan-ignore argument.type
+            return SymfonyYaml::parse($text, $flags);
+        } catch (Throwable $error) {
+            // Throwable, not TypeError: symfony declares only ParseException.
+            if (!$error instanceof TypeError || ($flags & SymfonyYaml::PARSE_OBJECT_FOR_MAP) === 0) {
+                throw $error;
+            }
+
+            // @phpstan-ignore argument.type
+            return self::mapsToObjects(SymfonyYaml::parse($text, $flags & ~SymfonyYaml::PARSE_OBJECT_FOR_MAP));
+        }
+    }
+
+    /**
+     * Non-empty arrays that are not lists become `stdClass`, as `PARSE_OBJECT_FOR_MAP` gives.
+     */
+    private static function mapsToObjects(mixed $value): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+
+        $value = array_map(self::mapsToObjects(...), $value);
+
+        return $value === [] || array_is_list($value) ? $value : (object) $value;
     }
 
     private static function hasMidnight(mixed $value): bool
