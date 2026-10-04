@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/packagist/l/asignua/filament-json-yaml-editor.svg?style=flat-square)](https://github.com/asignua/filament-json-yaml-editor/blob/main/LICENSE.md)
 [![Plumb score](https://plumbphp.dev/badges/asignua/filament-json-yaml-editor/composite.svg)](https://plumbphp.dev/asignua/filament-json-yaml-editor)
 
-<img class="filament-hidden" src="https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/main/art/cover.jpg" alt="Filament JSON & YAML Editor">
+<img class="filament-hidden" src="https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/v1.0.0/art/cover.jpg" alt="Filament JSON & YAML Editor">
 
 JSON and YAML editing for [Filament](https://filamentphp.com) 5: two form fields and two infolist entries.
 
@@ -33,15 +33,15 @@ has no Filament 4/5 release, and YAML editing has had nothing at all.
 
 ## Screenshots
 
-![JSON code view with highlighting and a Format button](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/main/art/json-code.jpg)
+![JSON code view with highlighting and a Format button](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/v1.0.0/art/json-code.jpg)
 
-![JSON tree view with edit, add and remove](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/main/art/json-tree.jpg)
+![JSON tree view with edit, add and remove](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/v1.0.0/art/json-tree.jpg)
 
-![YAML editor with a lint error on the offending line](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/main/art/yaml.jpg)
+![YAML editor with a lint error on the offending line](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/v1.0.0/art/yaml.jpg)
 
-![Dark mode](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/main/art/json-dark.jpg)
+![Dark mode](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/v1.0.0/art/json-dark.jpg)
 
-![Read-only entries with collapse and copy](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/main/art/entries.jpg)
+![Read-only entries with collapse and copy](https://raw.githubusercontent.com/asignua/filament-json-yaml-editor/v1.0.0/art/entries.jpg)
 
 ## Requirements
 
