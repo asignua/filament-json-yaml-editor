@@ -94,9 +94,11 @@ the text would store a JSON *string literal* instead of an object. `->asArray(fa
 such a cast, or one whose cast takes text). Outside a model (a
 custom page, a nested `->statePath()`) nothing is detected: pass `->asArray()` yourself.
 
-With `->asArray()` an empty JSON object `{}` stays an object: it is stored as `{}`, and when the form is reopened the
-text is built from the stored column, not from the cast's arrays (which would turn it into `[]`). This holds for the
-plain JSON casts; an encrypted cast stores ciphertext, so its `{}` is shown (and saved back) as `[]`. YAML timestamps
+With `->asArray()` an empty JSON object `{}` stays an object in both fields: it is stored as `{}` (an empty YAML map
+`a: {}` too, while `a: []` is stored as `[]`), and when the form is reopened the text is built from the stored column,
+not from the cast's arrays (which would turn it into `[]`). This holds for the plain JSON casts; an encrypted cast
+stores ciphertext, so its `{}` is shown (and saved back) as `[]`. A non-empty object whose keys are `0..n`
+(`{"0": "x", "1": "y"}`, or YAML `0: x`) is a list to PHP and is stored as `["x", "y"]`. YAML timestamps
 stay strings (`released: 2024-01-01` is stored as `"2024-01-01"`, `at: 2024-01-01T00:00:00Z` as
 `"2024-01-01T00:00:00+00:00"`), not unix integers.
 

@@ -9,12 +9,10 @@ use Asignua\FilamentJsonYamlEditor\Enums\EditorMode;
 use Asignua\FilamentJsonYamlEditor\Rules\JsonRule;
 use Asignua\FilamentJsonYamlEditor\Rules\JsonSchemaRule;
 use Asignua\FilamentJsonYamlEditor\Support\Json;
-use Asignua\FilamentJsonYamlEditor\Support\Yaml;
 use Closure;
 use Filament\Forms\Components\Field;
 use Filament\Support\Components\Contracts\HasEmbeddedView;
 use Filament\Support\Concerns\HasExtraAlpineAttributes;
-use Illuminate\Database\Eloquent\Model;
 
 /**
  * A JSON field with a code view (highlighting, line numbers, folding, live lint with the
@@ -72,41 +70,14 @@ class JsonEditor extends Field implements HasEmbeddedView
     }
 
     /**
-     * The stored JSON of an unchanged record attribute with a JSON cast, re-indented. The cast
-     * decodes to arrays, which turns `{}` into `[]` (and big integers into floats): showing
-     * that would change the value on the next save.
-     *
-     * Only when the hydrated state is what the cast makes of that column: a page that filled
-     * the form with its own data (mutateFormDataBeforeFill(), an action's fillForm(), fill()
-     * with custom data) gets its own state shown, not the stored column.
+     * The stored JSON of an unchanged record attribute with a JSON cast, re-indented (see
+     * {@see ConfiguresEditor::rawColumnJson()}).
      */
     protected function rawColumnText(mixed $state): ?string
     {
-        if (!$this->modelCastsToArray()) {
-            return null;
-        }
+        $raw = $this->rawColumnJson($state);
 
-        $record = $this->getRecord();
-        $name = $this->getName();
-
-        if (!$record instanceof Model || !$record->isClean($name)) {
-            return null;
-        }
-
-        $raw = $record->getRawOriginal($name);
-
-        // Encrypted casts store ciphertext: that is not JSON, and the array is used instead.
-        if (!is_string($raw) || trim($raw) === '' || !Json::check($raw)[0]) {
-            return null;
-        }
-
-        // The casts decode with json_decode() defaults, so the same column gives the same
-        // scalars (big integers as the same floats); objects are compared as arrays.
-        if (json_decode($raw, true) !== Yaml::normalize($state)) {
-            return null;
-        }
-
-        return Json::reformat($raw, $this->getIndent());
+        return $raw === null ? null : Json::reformat($raw, $this->getIndent());
     }
 
     /**

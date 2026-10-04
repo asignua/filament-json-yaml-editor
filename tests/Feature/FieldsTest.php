@@ -233,6 +233,35 @@ class FieldsTest extends TestCase
         $this->assertStringContainsString('"id": 12345678901234567890', Livewire::test(EditSetting::class, ['record' => $setting->getKey()])->get('data.settings'));
     }
 
+    public function test_yaml_as_array_keeps_empty_maps(): void
+    {
+        Livewire::test(CreateSetting::class)
+            ->fillForm(['config_data' => "a: {}\nb: []\nc:\n  d: {}\n"])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('{"a":{},"b":[],"c":{"d":{}}}', Setting::query()->firstOrFail()->getRawOriginal('config_data'));
+    }
+
+    public function test_yaml_empty_maps_survive_reopening_a_json_cast(): void
+    {
+        $setting = $this->setting();
+        Setting::query()->whereKey($setting->getKey())->update([
+            'config_data' => '{"meta":{},"list":[],"b":1,"n":{"x":{}}}',
+            'options' => '{"m":{},"l":[]}',
+        ]);
+
+        $component = Livewire::test(EditSetting::class, ['record' => $setting->getKey()]);
+        $this->assertSame("meta: {}\nlist: []\nb: 1\n'n':\n  x: {}\n", $component->get('data.config_data'));
+        $this->assertSame("m: {}\nl: []\n", $component->get('data.options'));
+
+        $component->call('save')->assertHasNoFormErrors();
+        $setting->refresh();
+
+        $this->assertSame('{"meta":{},"list":[],"b":1,"n":{"x":{}}}', $setting->getRawOriginal('config_data'));
+        $this->assertSame('{"m":{},"l":[]}', $setting->getRawOriginal('options'));
+    }
+
     public function test_data_the_page_fills_in_wins_over_the_stored_column(): void
     {
         $setting = $this->setting();

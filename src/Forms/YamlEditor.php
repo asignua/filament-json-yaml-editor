@@ -7,11 +7,13 @@ namespace Asignua\FilamentJsonYamlEditor\Forms;
 use Asignua\FilamentJsonYamlEditor\Concerns\ConfiguresEditor;
 use Asignua\FilamentJsonYamlEditor\Rules\JsonSchemaRule;
 use Asignua\FilamentJsonYamlEditor\Rules\YamlRule;
+use Asignua\FilamentJsonYamlEditor\Support\Json;
 use Asignua\FilamentJsonYamlEditor\Support\Yaml;
 use Closure;
 use Filament\Forms\Components\Field;
 use Filament\Support\Components\Contracts\HasEmbeddedView;
 use Filament\Support\Concerns\HasExtraAlpineAttributes;
+use Symfony\Component\Yaml\Yaml as SymfonyYaml;
 
 /**
  * A YAML field: highlighting, folding, line numbers and a live lint (js-yaml) that shows
@@ -41,7 +43,18 @@ class YamlEditor extends Field implements HasEmbeddedView
                 return;
             }
 
-            $component->state(Yaml::encode($state, $component->getInline(), $component->getIndent(), $component->getDumpFlags()));
+            $flags = $component->getDumpFlags();
+
+            if ($component->isArray()) {
+                // Saved, the text is parsed back with empty maps kept as objects: an empty
+                // array must read `[]`, and an empty object `{}`. The cast's arrays have lost
+                // that difference, so an unchanged record is dumped from its stored JSON.
+                $raw = $component->rawColumnJson($state);
+                $state = $raw === null ? $state : Json::decode($raw);
+                $flags |= SymfonyYaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE;
+            }
+
+            $component->state(Yaml::encode($state, $component->getInline(), $component->getIndent(), $flags));
         });
 
         $this->dehydrateStateUsing(function (YamlEditor $component, mixed $state): mixed {
@@ -53,7 +66,7 @@ class YamlEditor extends Field implements HasEmbeddedView
                 return null;
             }
 
-            return $component->isArray() ? Yaml::decode($state) : $state;
+            return $component->isArray() ? Yaml::decodeToArrays($state) : $state;
         });
 
         // With ->asArray() the syntax rule stays even after validateSyntax(false): invalid text

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Asignua\FilamentJsonYamlEditor\Concerns;
 
+use Asignua\FilamentJsonYamlEditor\Support\Json;
+use Asignua\FilamentJsonYamlEditor\Support\Yaml;
 use Closure;
 use Illuminate\Database\Eloquent\Casts\AsArrayObject;
 use Illuminate\Database\Eloquent\Casts\AsCollection;
@@ -106,6 +108,44 @@ trait ConfiguresEditor
             AsEncryptedArrayObject::class,
             AsEncryptedCollection::class,
         ]), true);
+    }
+
+    /**
+     * The stored JSON of an unchanged record attribute with a JSON cast. The cast decodes to
+     * arrays, which turns `{}` into `[]` (and big integers into floats): showing that would
+     * change the value on the next save, so the field builds its text from this instead.
+     *
+     * Only when the hydrated state is what the cast makes of that column: a page that filled
+     * the form with its own data (mutateFormDataBeforeFill(), an action's fillForm(), fill()
+     * with custom data) gets its own state shown, not the stored column.
+     */
+    protected function rawColumnJson(mixed $state): ?string
+    {
+        if (!$this->modelCastsToArray()) {
+            return null;
+        }
+
+        $record = $this->getRecord();
+        $name = $this->getName();
+
+        if (!$record instanceof Model || !$record->isClean($name)) {
+            return null;
+        }
+
+        $raw = $record->getRawOriginal($name);
+
+        // Encrypted casts store ciphertext: that is not JSON, and the array is used instead.
+        if (!is_string($raw) || trim($raw) === '' || !Json::check($raw)[0]) {
+            return null;
+        }
+
+        // The casts decode with json_decode() defaults, so the same column gives the same
+        // scalars (big integers as the same floats); objects are compared as arrays.
+        if (json_decode($raw, true) !== Yaml::normalize($state)) {
+            return null;
+        }
+
+        return $raw;
     }
 
     public function wrapLines(bool|Closure $condition = true): static

@@ -137,4 +137,14 @@ class CodecTest extends TestCase
         );
         $this->assertSame(['d' => '2024-01-01'], Yaml::datesToStrings(Yaml::parse('d: 2024-01-01', SymfonyYaml::PARSE_DATETIME), "d: 2024-01-01\n# 2024-01-01T00:00:00Z"));
     }
+
+    public function test_yaml_decode_to_arrays_keeps_empty_maps_and_dates(): void
+    {
+        $value = Yaml::decodeToArrays("a: {}\nb: []\nc:\n  at: 2024-01-01T00:00:00Z\n  on: 2024-01-01\nd:\n  - {}\n");
+
+        $this->assertEquals(['a' => new stdClass, 'b' => [], 'c' => ['at' => '2024-01-01T00:00:00+00:00', 'on' => '2024-01-01'], 'd' => [new stdClass]], $value);
+        $this->assertSame('{"a":{},"b":[],"c":{"at":"2024-01-01T00:00:00+00:00","on":"2024-01-01"},"d":[{}]}', json_encode($value));
+        $this->assertSame("a: {}\nb: []\n", Yaml::encode(['a' => new stdClass, 'b' => []], flags: SymfonyYaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE));
+        $this->assertNull(Yaml::decodeToArrays('a: ['));
+    }
 }

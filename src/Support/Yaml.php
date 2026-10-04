@@ -57,6 +57,16 @@ final class Yaml
     }
 
     /**
+     * Like decode(), but for a value that is stored as JSON: maps become associative arrays,
+     * except empty ones, which stay an empty `stdClass` (so `{}` is stored as `{}`, not as
+     * `[]`, the same as {@see Json::decode()}). A map with the keys 0..n still becomes a list.
+     */
+    public static function decodeToArrays(string $text): mixed
+    {
+        return Json::toArrays(self::decode($text, SymfonyYaml::PARSE_OBJECT_FOR_MAP));
+    }
+
+    /**
      * Parses with the expansion guard. Without `PARSE_DATETIME` in `$flags` an unquoted
      * timestamp comes back as its ISO string, not as symfony's default unix integer.
      *
@@ -74,10 +84,14 @@ final class Yaml
         return $keepDates ? $value : self::datesToStrings($value, $text, $flags);
     }
 
+    /**
+     * An empty object (an empty `stdClass`) is dumped as `{}`; everything else as normalize()
+     * makes it.
+     */
     public static function encode(mixed $value, int $inline = 10, int $indent = 2, int $flags = 0): string
     {
         // @phpstan-ignore argument.type
-        $yaml = SymfonyYaml::dump(self::normalize($value), $inline, $indent, $flags);
+        $yaml = SymfonyYaml::dump(self::normalizeValue($value, true), $inline, $indent, $flags | SymfonyYaml::DUMP_OBJECT_AS_MAP);
 
         return rtrim($yaml)."\n";
     }
@@ -88,7 +102,19 @@ final class Yaml
      */
     public static function normalize(mixed $value): mixed
     {
+        return self::normalizeValue($value, false);
+    }
+
+    /**
+     * @param bool $keepEmptyObjects keep an empty `stdClass` (dumped as `{}` by encode())
+     */
+    private static function normalizeValue(mixed $value, bool $keepEmptyObjects): mixed
+    {
         if ($value instanceof DateTimeInterface) {
+            return $value;
+        }
+
+        if ($keepEmptyObjects && $value instanceof stdClass && get_object_vars($value) === []) {
             return $value;
         }
 
@@ -103,7 +129,7 @@ final class Yaml
         }
 
         if (is_array($value)) {
-            return array_map(self::normalize(...), $value);
+            return array_map(static fn (mixed $item): mixed => self::normalizeValue($item, $keepEmptyObjects), $value);
         }
 
         return $value;

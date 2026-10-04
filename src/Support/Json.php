@@ -48,9 +48,10 @@ final class Json
     }
 
     /**
-     * Objects to associative arrays, except empty ones.
+     * Objects to associative arrays, except empty ones: an empty `stdClass` is kept, so it is
+     * encoded as `{}`, not as `[]`.
      */
-    private static function toArrays(mixed $value): mixed
+    public static function toArrays(mixed $value): mixed
     {
         if ($value instanceof stdClass) {
             $vars = get_object_vars($value);
