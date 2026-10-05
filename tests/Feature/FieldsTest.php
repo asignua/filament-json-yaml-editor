@@ -252,8 +252,9 @@ class FieldsTest extends TestCase
         ]);
 
         $component = Livewire::test(EditSetting::class, ['record' => $setting->getKey()]);
-        $this->assertSame("meta: {}\nlist: []\nb: 1\n'n':\n  x: {}\n", $component->get('data.config_data'));
-        $this->assertSame("m: {}\nl: []\n", $component->get('data.options'));
+        // symfony/yaml 7 dumps an empty map as `{  }`, 8 as `{}` — both are the same YAML.
+        $this->assertSame("meta: {}\nlist: []\nb: 1\n'n':\n  x: {}\n", str_replace('{  }', '{}', $component->get('data.config_data')));
+        $this->assertSame("m: {}\nl: []\n", str_replace('{  }', '{}', $component->get('data.options')));
 
         $component->call('save')->assertHasNoFormErrors();
         $setting->refresh();

@@ -144,7 +144,8 @@ class CodecTest extends TestCase
 
         $this->assertEquals(['a' => new stdClass, 'b' => [], 'c' => ['at' => '2024-01-01T00:00:00+00:00', 'on' => '2024-01-01'], 'd' => [new stdClass]], $value);
         $this->assertSame('{"a":{},"b":[],"c":{"at":"2024-01-01T00:00:00+00:00","on":"2024-01-01"},"d":[{}]}', json_encode($value));
-        $this->assertSame("a: {}\nb: []\n", Yaml::encode(['a' => new stdClass, 'b' => []], flags: SymfonyYaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE));
+        // symfony/yaml 7 dumps an empty map as `{  }`, 8 as `{}` — both are the same YAML.
+        $this->assertSame("a: {}\nb: []\n", str_replace('{  }', '{}', Yaml::encode(['a' => new stdClass, 'b' => []], flags: SymfonyYaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE)));
         $this->assertNull(Yaml::decodeToArrays('a: ['));
     }
 
