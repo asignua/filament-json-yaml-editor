@@ -2,7 +2,7 @@
 
 All notable changes to `asignua/filament-json-yaml-editor` are documented here.
 
-## v1.0.0 - unreleased
+## v1.0.0 - 2026-10-05
 
 - `JsonEditor` form field: code view (CodeMirror 6: highlighting, line numbers, folding) and tree view (expand / collapse, edit values, rename keys, change types, add and remove), live validation with the error line, `->format()` button, `->indent()`, `->height()`, `->modes()`, `->defaultMode()`, read-only when disabled, dark mode follows Filament.
 - `YamlEditor` form field: CodeMirror 6 with the YAML language and a live `js-yaml` lint with the error line; `->inline()`, `->indent()`, `->dumpFlags()` control how an array from the model is dumped.
