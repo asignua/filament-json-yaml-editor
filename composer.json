@@ -1,6 +1,6 @@
 {
     "name": "asignua/filament-json-yaml-editor",
-    "description": "JSON and YAML editors for Filament 5: code and tree modes, live validation with the error line, JSON Schema and symfony/yaml server-side rules, plus highlighted infolist entries.",
+    "description": "JSON and YAML editing for Filament 5: a JsonEditor field with a code view (highlighting, line numbers, folding) and an editable tree view, live validation with the error line, a Format button and optional JSON Schema; a YamlEditor field with live lint; read-only JsonEntry and YamlEntry for infolists with copy; and server-side JsonRule, YamlRule (symfony/yaml) and JsonSchemaRule.",
     "keywords": ["filament", "filament-plugin", "laravel", "json", "yaml", "json-editor", "yaml-editor", "codemirror", "json-schema"],
     "homepage": "https://github.com/asignua/filament-json-yaml-editor",
     "support": {
