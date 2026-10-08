@@ -37,6 +37,15 @@ test('formatJson pretty-prints valid JSON and refuses invalid', () => {
     assert.equal(formatJson('{"a":', 2), null)
 })
 
+test('formatJson changes only whitespace', () => {
+    const text = '{"id": 12345678901234567890, "b": 1.0, "1": 2, "b": 3, "e": {}, "l": [ ], "s": "a\\"b"}'
+
+    assert.equal(
+        formatJson(text, 2),
+        '{\n  "id": 12345678901234567890,\n  "b": 1.0,\n  "1": 2,\n  "b": 3,\n  "e": {},\n  "l": [],\n  "s": "a\\"b"\n}',
+    )
+})
+
 test('isBlank', () => {
     assert.equal(isBlank('  \n'), true)
     assert.equal(isBlank(null), true)

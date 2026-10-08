@@ -9,10 +9,14 @@ use Asignua\FilamentJsonYamlEditor\Forms\JsonEditor;
 use Asignua\FilamentJsonYamlEditor\Forms\YamlEditor;
 use Asignua\FilamentJsonYamlEditor\Infolists\JsonEntry;
 use Asignua\FilamentJsonYamlEditor\Rules\JsonSchemaRule;
+use Asignua\FilamentJsonYamlEditor\Support\Yaml;
 use Asignua\FilamentJsonYamlEditor\Tests\TestCase;
 use Filament\Schemas\Schema;
+use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
+use Illuminate\Database\Eloquent\Model;
 use Livewire\Livewire;
 use ReflectionMethod;
+use Symfony\Component\Yaml\Yaml as SymfonyYaml;
 use Workbench\App\Filament\Resources\Settings\Pages\CreateSetting;
 use Workbench\App\Filament\Resources\Settings\Pages\EditSetting;
 use Workbench\App\Models\Setting;
@@ -169,6 +173,27 @@ class FieldsTest extends TestCase
         $this->assertStringContainsString("released: '2024-01-01'", $text);
     }
 
+    public function test_a_top_level_string_survives_save_and_reopen(): void
+    {
+        $setting = $this->setting();
+
+        foreach (['123', 'hello', 'a: b'] as $string) {
+            $setting->extras = $string;
+            $setting->config_data = $string;
+            $setting->save();
+
+            $component = Livewire::test(EditSetting::class, ['record' => $setting->getKey()]);
+
+            $this->assertSame(json_encode($string), $component->get('data.extras'));
+            $this->assertSame(trim(Yaml::encode($string, 10, 2, SymfonyYaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE)), trim((string) $component->get('data.config_data')));
+
+            $component->call('save')->assertHasNoFormErrors();
+
+            $this->assertSame($string, $setting->refresh()->extras);
+            $this->assertSame($string, $setting->config_data);
+        }
+    }
+
     public function test_an_array_cast_without_as_array_still_stores_an_array(): void
     {
         Livewire::test(CreateSetting::class)
@@ -304,10 +329,57 @@ class FieldsTest extends TestCase
         $this->assertTrue($field->isArray());
     }
 
+    public function test_a_string_survives_reopening_a_custom_cast(): void
+    {
+        $model = new class extends Setting
+        {
+            public function getCasts(): array
+            {
+                return [...parent::getCasts(), 'extras' => UnescapedCast::class];
+            }
+        };
+
+        $stored = static function (JsonEditor|YamlEditor $field, string $raw, string $state) use ($model): ?string {
+            $record = $model->newFromBuilder(['id' => 1, 'extras' => $raw]);
+            $field->asArray()->container(Schema::make()->model($record));
+
+            return (new ReflectionMethod($field, 'storedStringJson'))->invoke($field, $state);
+        };
+
+        foreach ([JsonEditor::make('extras'), YamlEditor::make('extras')] as $field) {
+            $this->assertSame('"123"', $stored($field, '"123"', '123'));
+            $this->assertSame('"hello"', $stored($field, '"hello"', 'hello'));
+            $this->assertSame('"Привіт"', $stored($field, '"Привіт"', 'Привіт'));
+            // A plain text column holding the same characters is not a JSON string literal.
+            $this->assertNull($stored($field, '123', '123'));
+            // Not what the cast made of the column: a page filled the form itself.
+            $this->assertNull($stored($field, '"123"', '456'));
+        }
+
+        // A nested name reads the string out of the cast's array.
+        $record = $model->newFromBuilder(['id' => 1, 'extras' => '{"a":"123"}']);
+        $nested = JsonEditor::make('extras.a')->asArray()->container(Schema::make()->model($record));
+
+        $this->assertSame('"123"', (new ReflectionMethod($nested, 'storedStringJson'))->invoke($nested, '123'));
+    }
+
     public function test_the_json_entry_keeps_big_integers(): void
     {
         $text = (new ReflectionMethod(JsonEntry::class, 'toText'))->invoke(JsonEntry::make('x'), '{"id":12345678901234567890}');
 
         $this->assertSame("{\n  \"id\": 12345678901234567890\n}", $text);
+    }
+}
+
+class UnescapedCast implements CastsAttributes
+{
+    public function get(Model $model, string $key, mixed $value, array $attributes): mixed
+    {
+        return $value === null ? null : json_decode($value, true);
+    }
+
+    public function set(Model $model, string $key, mixed $value, array $attributes): mixed
+    {
+        return json_encode($value, JSON_UNESCAPED_UNICODE);
     }
 }

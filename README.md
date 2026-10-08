@@ -100,7 +100,7 @@ not from the cast's arrays (which would turn it into `[]`). This holds for the p
 stores ciphertext, so its `{}` is shown (and saved back) as `[]`. A non-empty object whose keys are `0..n`
 (`{"0": "x", "1": "y"}`, or YAML `0: x`) is a list to PHP and is stored as `["x", "y"]`. YAML timestamps
 stay strings (`released: 2024-01-01` is stored as `"2024-01-01"`, `at: 2024-01-01T00:00:00Z` as
-`"2024-01-01T00:00:00+00:00"`), not unix integers.
+`"2024-01-01T00:00:00+00:00"`), not unix integers; an unquoted date key (`2024-12-25: x`) stays the string `"2024-12-25"` too (block maps and lists only; a date key inside a flow map `{2024-12-25: x}` is not supported).
 
 **Integers beyond `PHP_INT_MAX` change type with `->asArray()`.** PHP cannot hold them as numbers, so
 `{"id": 12345678901234567890}` is stored as `{"id": "12345678901234567890"}`: the digits are kept, but from then on the

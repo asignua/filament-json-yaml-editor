@@ -15,6 +15,7 @@ use JsonSchema\Exception\ResourceNotFoundException;
 use JsonSchema\Validator as JustinRainbowValidator;
 use LogicException;
 use Opis\JsonSchema\Errors\ErrorFormatter;
+use Opis\JsonSchema\Exceptions\SchemaException;
 use Opis\JsonSchema\Validator as OpisValidator;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml as SymfonyYaml;
@@ -110,7 +111,16 @@ class JsonSchemaRule implements ValidationRule
      */
     protected function opis(mixed $data): array
     {
-        $result = (new OpisValidator)->validate($data, $this->schemaObject());
+        // Opis stops at the first error by default; maxErrors() is applied by validate().
+        $validator = new OpisValidator(null, max(1, $this->maxErrors), false);
+
+        try {
+            $result = $validator->validate($data, $this->schemaObject());
+        } catch (SchemaException $exception) {
+            // An unresolvable `$ref` (remote, file://) or a malformed keyword: a validation
+            // error, as with justinrainbow, not a 500.
+            return [$exception->getMessage()];
+        }
 
         if ($result->isValid()) {
             return [];
@@ -124,7 +134,7 @@ class JsonSchemaRule implements ValidationRule
 
         $errors = [];
 
-        foreach ((new ErrorFormatter)->format($error, false) as $path => $messages) {
+        foreach ((new ErrorFormatter)->format($error, true) as $path => $messages) {
             foreach ((array) $messages as $message) {
                 $errors[] = ($path === '/' || $path === '' ? '' : $path.': ').$message;
             }

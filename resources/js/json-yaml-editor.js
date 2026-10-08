@@ -199,7 +199,7 @@ export default function jsonYamlEditorFormComponent({
         },
 
         errorText() {
-            return this.error ? this.labels.errorAtLine.replace(':line', this.error.line).replace(':message', this.error.message) : ''
+            return this.error ? this.labels.errorAtLine.replace(':line', () => String(this.error.line)).replace(':message', () => this.error.message) : ''
         },
 
         replaceDoc(text) {

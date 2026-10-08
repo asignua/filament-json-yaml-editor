@@ -162,4 +162,93 @@ class CodecTest extends TestCase
             Yaml::decodeToArrays("base: &a {at: 2024-01-01T00:00:00Z}\nitem: {<<: *a, on: 2024-01-01}\n"),
         );
     }
+
+    public function test_a_merge_key_fallback_cannot_expand_an_alias_bomb(): void
+    {
+        $yaml = "m: &m {z: 1}\nl0: &l0 [x, x, x, x, x, x, x, x, x, x]\n";
+
+        for ($level = 1; $level <= 9; $level++) {
+            $yaml .= "l{$level}: &l{$level} [".implode(', ', array_fill(0, 10, '*l'.($level - 1)))."]\n";
+        }
+
+        $yaml .= "t: {<<: *m, k: 1}\n";
+
+        $this->assertFalse(Yaml::check($yaml)[0]);
+        $this->assertNull(Yaml::decodeToArrays($yaml));
+
+        // The fallback itself still works for an ordinary document.
+        $parsed = Yaml::parse("m: &m {z: 1}\nt: {<<: *m, k: 1}\n", SymfonyYaml::PARSE_OBJECT_FOR_MAP);
+        $this->assertSame(['z' => 1, 'k' => 1], (array) $parsed->t);
+    }
+
+    public function test_unquoted_date_keys_stay_strings(): void
+    {
+        $this->assertSame(['2024-01-01' => 'x'], Yaml::decodeToArrays("2024-01-01: x\n"));
+        $this->assertSame(
+            ['holidays' => ['2024-12-25' => 'Christmas', '2025-01-01' => 'New year'], 'list' => [['2024-02-02T10:00:00Z' => 1]]],
+            Yaml::decodeToArrays("holidays:\n  2024-12-25: Christmas\n  2025-01-01: New year\nlist:\n  - 2024-02-02T10:00:00Z: 1\n"),
+        );
+        // Text inside a block scalar is not a key, and a real integer key stays an integer.
+        $this->assertSame(
+            ['a' => "2024-01-01: not a key\n", 'b' => ['1704067200' => 'z']],
+            Yaml::decodeToArrays("a: |\n  2024-01-01: not a key\nb:\n  1704067200: z\n"),
+        );
+        // A quoted key was a string all along.
+        $this->assertSame(['2024-01-01' => 'x'], Yaml::decodeToArrays("'2024-01-01': x\n"));
+    }
+
+    public function test_date_keys_survive_a_comment_ending_in_a_block_indicator_and_a_quote_in_plain_text(): void
+    {
+        $this->assertSame(
+            ['a' => ['2024-01-01' => 'x']],
+            Yaml::decodeToArrays("a: # note: |\n  2024-01-01: x\n"),
+        );
+        $this->assertSame(
+            ['a' => ['b' => 1, '2024-01-01' => 'x']],
+            Yaml::decodeToArrays("a: # note: |\n  b: 1\n  2024-01-01: x\n"),
+        );
+        $this->assertSame(
+            ['text' => "it - 'quote", 'b' => ['2024-01-01' => 'x']],
+            Yaml::decodeToArrays("text: it - 'quote\nb:\n  2024-01-01: x\n"),
+        );
+        $this->assertSame(
+            ['text' => "a - &b 'c", 'b' => ['2024-01-01' => 'x']],
+            Yaml::decodeToArrays("text: a - &b 'c\nb:\n  2024-01-01: x\n"),
+        );
+    }
+
+    public function test_date_keys_do_not_touch_integer_keys_or_lists(): void
+    {
+        // 1735084800 is 2024-12-25 as a timestamp: a genuine integer key stays one.
+        $this->assertEquals(
+            ['d' => ['2024-12-25' => 'a'], 'other' => ['1735084800' => 'b']],
+            Yaml::decodeToArrays("d:\n  2024-12-25: a\nother:\n  1735084800: b\n"),
+        );
+        // 1970-01-01 is 0: it must not turn the list below into a map.
+        $this->assertSame(
+            ['1970-01-01' => 'x', 'list' => ['a', 'b', 'c']],
+            Yaml::decodeToArrays("1970-01-01: x\nlist: [a, b, c]\n"),
+        );
+        $this->assertSame(
+            ['1970-01-01' => 'x', 'list' => ['a', 'b', 'c']],
+            Yaml::decodeToArrays("1970-01-01: x\nlist:\n  - a\n  - b\n  - c\n"),
+        );
+    }
+
+    public function test_date_keys_are_not_quoted_inside_multi_line_quoted_scalars(): void
+    {
+        $this->assertSame(['desc' => 'foo 2024-01-01: bar'], Yaml::decodeToArrays("desc: \"foo\n  2024-01-01: bar\"\n"));
+        $this->assertSame(['desc' => 'foo 2024-01-01: bar'], Yaml::decodeToArrays("desc: 'foo\n  2024-01-01: bar'\n"));
+        $this->assertSame(['desc' => 'foo 2024-01-01: bar'], Yaml::decodeToArrays("desc: &a \"foo\n  2024-01-01: bar\"\n"));
+        $this->assertSame(['desc' => 'foo 2024-01-01: bar'], Yaml::decodeToArrays("desc: &a 'foo\n  2024-01-01: bar'\n"));
+        $this->assertSame(['a' => ['2024-01-01' => 'x']], Yaml::decodeToArrays("a:\n# note: |\n  2024-01-01: x\n"));
+        $this->assertSame(['a' => "it's", 'd' => ['2024-01-01' => 1]], Yaml::decodeToArrays("a: it's\nd:\n  2024-01-01: 1\n"));
+        $this->assertSame(['a' => 'x', 'd' => ['2024-01-01' => 1]], Yaml::decodeToArrays("a: 'x'\nd:\n  2024-01-01: 1\n"));
+        $this->assertSame(['a' => 'a >', 'd' => ['2024-01-01' => 1]], Yaml::decodeToArrays("a: a >\nd:\n  2024-01-01: 1\n"));
+    }
+
+    public function test_nested_list_date_keys_stay_strings(): void
+    {
+        $this->assertSame([[['2024-01-01' => 'x']]], Yaml::decodeToArrays("- - 2024-01-01: x\n"));
+    }
 }

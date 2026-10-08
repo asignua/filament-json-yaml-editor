@@ -39,11 +39,25 @@ class YamlEditor extends Field implements HasEmbeddedView
         parent::setUp();
 
         $this->afterStateHydrated(function (YamlEditor $component, mixed $state): void {
-            if ($state === null || is_string($state)) {
+            if ($state === null) {
                 return;
             }
 
             $flags = $component->getDumpFlags();
+
+            if (is_string($state)) {
+                // A top-level string stored by an array cast must be dumped as a YAML scalar
+                // (quoted when needed), not shown as the bare text, which would change type.
+                $raw = $component->isArray() ? ($component->rawColumnJson($state) ?? $component->storedStringJson($state)) : null;
+
+                if ($raw === null) {
+                    return;
+                }
+
+                $component->state(Yaml::encode(Json::decode($raw), $component->getInline(), $component->getIndent(), $flags | SymfonyYaml::DUMP_EMPTY_ARRAY_AS_SEQUENCE));
+
+                return;
+            }
 
             if ($component->isArray()) {
                 // Saved, the text is parsed back with empty maps kept as objects: an empty

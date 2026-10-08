@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Asignua\FilamentJsonYamlEditor\Support;
 
+use DateTimeImmutable;
 use DateTimeInterface;
+use DateTimeZone;
 use Illuminate\Contracts\Support\Arrayable;
 use JsonSerializable;
 use stdClass;
@@ -78,6 +80,10 @@ final class Yaml
     {
         $keepDates = ($flags & SymfonyYaml::PARSE_DATETIME) !== 0;
 
+        if (!$keepDates) {
+            $text = self::quoteDateKeys($text);
+        }
+
         $value = self::symfonyParse($text, $flags | SymfonyYaml::PARSE_DATETIME);
 
         self::guardExpansion($value, self::EXPANSION_BUDGET + 10 * strlen($text));
@@ -147,7 +153,194 @@ final class Yaml
     {
         $marks = $source !== null && self::hasMidnight($value) ? self::timeMarks($source, $flags) : null;
 
-        return self::convertDates($value, $marks);
+        $value = self::convertDates($value, $marks);
+
+        return $value;
+    }
+
+    /**
+     * The source with every unquoted timestamp key (`2024-12-25: x`) put in quotes, so symfony
+     * keeps it a string instead of a unix integer. The change is made at the very line and
+     * position of the key, so a genuine integer key or a list index elsewhere is never
+     * renamed by mistake. Quoted keys are not matched.
+     */
+    private static function quoteDateKeys(string $source): string
+    {
+        $pattern = '/^[ \\t]*(?:-[ \\t]+)*(\\d{4}-\\d\\d?-\\d\\d?(?:(?:[Tt]|[ \\t]+)\\d\\d?:\\d\\d:\\d\\d(?:\\.\\d*)?(?:[ \\t]*(?:Z|[+-]\\d\\d(?::?\\d\\d)?))?)?)[ \\t]*:(?:[ \\t]|$)/';
+
+        $blockIndent = null;
+        $quote = null;
+        $depth = 0;
+        $lines = preg_split('/(\R)/', $source, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [];
+
+        foreach ($lines as $i => $line) {
+            if ($i % 2 === 1) {
+                continue;
+            }
+
+            $indent = strlen($line) - strlen(ltrim($line, " \t"));
+
+            // Inside a block scalar (`key: |`) a line that looks like a date key is text.
+            if ($blockIndent !== null) {
+                if (trim($line) === '' || $indent > $blockIndent) {
+                    continue;
+                }
+
+                $blockIndent = null;
+            }
+
+            // A line inside a multi-line quoted scalar or a flow collection is text, not a key.
+            if ($quote !== null || $depth > 0) {
+                self::scanLine($line, $quote, $depth);
+
+                continue;
+            }
+
+            if (preg_match('/(?:^[ \t]*(?:-[ \t]+)*|[:-][ \t]+)(?:[&!]\S*[ \t]+)*[|>][+\-0-9]*[ \t]*$/', self::withoutComment($line)) === 1) {
+                $blockIndent = $indent;
+
+                continue;
+            }
+
+            $original = $line;
+
+            if (preg_match($pattern, $line, $match, PREG_OFFSET_CAPTURE) === 1) {
+                try {
+                    new DateTimeImmutable($match[1][0], new DateTimeZone('UTC'));
+
+                    $lines[$i] = substr($line, 0, $match[1][1]).'"'.$match[1][0].'"'.substr($line, $match[1][1] + strlen($match[1][0]));
+                } catch (Throwable) {
+                    // not a date after all: the key stays what symfony made of it
+                }
+            }
+
+            self::scanLine($original, $quote, $depth);
+        }
+
+        return implode('', $lines);
+    }
+
+    /**
+     * The line without a trailing ` #…` comment. A `#` counts only when it follows whitespace
+     * and sits outside a quoted scalar, so `a: "x #y"` keeps its text.
+     */
+    private static function withoutComment(string $line): string
+    {
+        $quote = null;
+        $length = strlen($line);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $line[$i];
+            $prev = $i === 0 ? ' ' : $line[$i - 1];
+
+            if ($quote !== null) {
+                if ($quote === '"' && $char === '\\') {
+                    $i++;
+                } elseif ($char === $quote) {
+                    $quote = null;
+                }
+
+                continue;
+            }
+
+            if (($char === '"' || $char === "'") && ($prev === ' ' || $prev === "\t" || str_contains(':-?,[{', $prev))) {
+                $quote = $char;
+            } elseif ($char === '#' && ($prev === ' ' || $prev === "\t")) {
+                return substr($line, 0, $i);
+            }
+        }
+
+        return $line;
+    }
+
+    /**
+     * Whether the text before a `:` is a mapping key (the colon then opens a value) and not
+     * a plain value that already followed an earlier `key:`.
+     */
+    private static function isKey(string $text): bool
+    {
+        $text = (string) preg_replace('/^(?:-[ \t]+)*(?:\?[ \t]+)?/', '', ltrim($text, " \t"));
+        $text = (string) preg_replace('/"(?:[^"\\\\]|\\\\.)*"|\'(?:[^\']|\'\')*\'/', '', $text);
+
+        return preg_match('/:(?:[ \t]|$)/', $text) !== 1;
+    }
+
+    /**
+     * Follows quoted scalars and flow collections across lines: after the line, `$quote` is the
+     * quote still open (a multi-line scalar) and `$depth` the number of open `[` / `{`. A quote
+     * or bracket only counts where a value can start, so an apostrophe inside plain text
+     * (`it's`) opens nothing. Flow maps with date keys are left as they are.
+     */
+    private static function scanLine(string $line, ?string &$quote, int &$depth): void
+    {
+        $length = strlen($line);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $line[$i];
+
+            if ($quote === '"') {
+                if ($char === '\\') {
+                    $i++;
+                } elseif ($char === '"') {
+                    $quote = null;
+                }
+
+                continue;
+            }
+
+            if ($quote === "'") {
+                if ($char === "'") {
+                    if (($line[$i + 1] ?? '') === "'") {
+                        $i++;
+                    } else {
+                        $quote = null;
+                    }
+                }
+
+                continue;
+            }
+
+            if ($char === '#' && ($i === 0 || $line[$i - 1] === ' ' || $line[$i - 1] === "\t")) {
+                return;
+            }
+
+            if (($char === ']' || $char === '}') && $depth > 0) {
+                $depth--;
+
+                continue;
+            }
+
+            if ($char !== '"' && $char !== "'" && $char !== '[' && $char !== '{') {
+                continue;
+            }
+
+            $before = rtrim(substr($line, 0, $i));
+            $spaced = strlen($before) < $i;
+
+            // Anchor and tag tokens (`&a`, `!!str`) sit between the indicator and the value.
+            if ($spaced) {
+                $before = rtrim((string) preg_replace('/(?:^|[ \t]+)(?:[&!]\S*[ \t]+)*[&!]\S*$/', '', $before));
+            }
+
+            $last = substr($before, -1);
+            $lead = ltrim($before, " \t");
+            $starts = $before === ''
+                || ($last === '-' && $spaced && preg_match('/^(?:-[ \t]+)*-$/', $lead) === 1)
+                || ($last === '?' && $spaced && preg_match('/^(?:-[ \t]+)*\?$/', $lead) === 1)
+                || ($last === ':' && $spaced && self::isKey(substr($lead, 0, -1)))
+                || ($last !== '' && str_contains('[{', $last))
+                || ($last === ',' && $depth > 0);
+
+            if (!$starts) {
+                continue;
+            }
+
+            if ($char === '[' || $char === '{') {
+                $depth++;
+            } else {
+                $quote = $char;
+            }
+        }
     }
 
     /**
@@ -196,7 +389,12 @@ final class Yaml
             }
 
             // @phpstan-ignore argument.type
-            return self::mapsToObjects(SymfonyYaml::parse($text, $flags & ~SymfonyYaml::PARSE_OBJECT_FOR_MAP));
+            $value = SymfonyYaml::parse($text, $flags & ~SymfonyYaml::PARSE_OBJECT_FOR_MAP);
+
+            // mapsToObjects() walks the whole expanded tree: the budget check must come first.
+            self::guardExpansion($value, self::EXPANSION_BUDGET + 10 * strlen($text));
+
+            return self::mapsToObjects($value);
         }
     }
 

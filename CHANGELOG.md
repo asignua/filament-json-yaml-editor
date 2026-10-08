@@ -2,6 +2,16 @@
 
 All notable changes to `asignua/filament-json-yaml-editor` are documented here.
 
+## Unreleased
+
+- Dependencies: js-yaml 4 to 5 (bundled; YAML timestamps now load as strings, `!!set` and other non-core tags are no longer accepted by default), esbuild 0.28, jsdom 30 (dev).
+- Security: an alias bomb combined with a merge key in a flow map can no longer exhaust memory; the expansion guard now also runs on the fallback parse (`Yaml::parse()`, `Yaml::decodeToArrays()`, `YamlRule`, `JsonSchemaRule::yaml()`).
+- A top-level string stored by an array cast (built-in or custom, including nested field names) (`"123"`, `"hello"`, `a: b`) is shown as JSON / YAML text and saved back as the same string, in `JsonEditor` and `YamlEditor`.
+- The `Format` button only re-indents: big integers, `1.0`, duplicate keys and key order are kept as written.
+- Unquoted YAML date keys (`2024-12-25: x`) stay strings instead of becoming unix timestamps. Block-scalar text and the continuation lines of multi-line quoted scalars (also after an anchor or tag) or flow collections are not mistaken for a key; a comment ending in `: |` does not start a block scalar (also a trailing one after a key); a quote after a spaced `-`, `:` or `?` inside plain text opens no scalar. A date key inside a flow map (`{2024-01-01: a}`) is not covered: it is still rejected when parsing without `PARSE_DATETIME`.
+- `JsonSchemaRule` with `opis/json-schema` reports up to `maxErrors()` messages, and an unresolvable `$ref` or a malformed schema keyword is a validation error, not a 500.
+- The editor's error line is no longer garbled by `$&` / `$'` in the parser message.
+
 ## v1.0.0 - 2026-10-05
 
 - `JsonEditor` form field: code view (CodeMirror 6: highlighting, line numbers, folding) and tree view (expand / collapse, edit values, rename keys, change types, add and remove), live validation with the error line, `->format()` button, `->indent()`, `->height()`, `->modes()`, `->defaultMode()`, read-only when disabled, dark mode follows Filament.

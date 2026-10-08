@@ -57,4 +57,25 @@ class SchemaEnginesTest extends TestCase
             @unlink((string) $file);
         }
     }
+
+    public function test_opis_reports_every_error_up_to_max_errors(): void
+    {
+        $schema = ['type' => 'object', 'properties' => ['a' => ['type' => 'integer'], 'b' => ['type' => 'string'], 'c' => ['type' => 'string']]];
+        $data = json_decode('{"a":"x","b":1,"c":3}');
+
+        $rule = JsonSchemaRule::make($schema)->maxErrors(5);
+        $errors = (new ReflectionMethod($rule, 'opis'))->invoke($rule, $data);
+
+        $this->assertCount(3, $errors);
+    }
+
+    public function test_opis_reports_an_unresolvable_ref_as_an_error(): void
+    {
+        foreach (['https://example.com/x.json', 'file:///etc/passwd'] as $uri) {
+            $rule = JsonSchemaRule::make(['properties' => ['a' => ['$ref' => $uri]]]);
+            $errors = (new ReflectionMethod($rule, 'opis'))->invoke($rule, json_decode('{"a":1}'));
+
+            $this->assertCount(1, $errors);
+        }
+    }
 }

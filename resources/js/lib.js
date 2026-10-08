@@ -184,9 +184,53 @@ export function parseYaml(text) {
 }
 
 export function formatJson(text, indent = 2) {
-    const result = parseJson(text)
+    if (!parseJson(text).ok) {
+        return null
+    }
 
-    return result.ok ? JSON.stringify(result.value, null, indent) : null
+    // Only whitespace changes: string and number lexemes are copied as they are, so big
+    // integers, `1.0`, duplicate keys and key order survive (JSON.stringify would alter them).
+    const pad = (depth) => '\n' + ' '.repeat(depth * Math.max(1, indent))
+    let out = ''
+    let depth = 0
+
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i]
+
+        if (char === '"') {
+            let end = i + 1
+
+            while (text[end] !== '"') {
+                end += text[end] === '\\' ? 2 : 1
+            }
+
+            out += text.slice(i, end + 1)
+            i = end
+        } else if (char === '{' || char === '[') {
+            let next = i + 1
+
+            while (' \t\r\n'.includes(text[next])) {
+                next++
+            }
+
+            if (text[next] === (char === '{' ? '}' : ']')) {
+                out += char + text[next]
+                i = next
+            } else {
+                out += char + pad(++depth)
+            }
+        } else if (char === '}' || char === ']') {
+            out += pad(--depth) + char
+        } else if (char === ',') {
+            out += ',' + pad(depth)
+        } else if (char === ':') {
+            out += ': '
+        } else if (!' \t\r\n'.includes(char)) {
+            out += char
+        }
+    }
+
+    return out
 }
 
 /* ---------------------------------------------------------------- tree */

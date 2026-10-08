@@ -43,7 +43,19 @@ class JsonEditor extends Field implements HasEmbeddedView
         parent::setUp();
 
         $this->afterStateHydrated(function (JsonEditor $component, mixed $state): void {
-            if ($state === null || is_string($state)) {
+            if ($state === null) {
+                return;
+            }
+
+            // A top-level string stored by an array cast (`"123"`, `"hello"`) must come back
+            // as JSON text with its quotes, not as the bare string, which would change type.
+            if (is_string($state)) {
+                $text = $component->isArray() ? ($component->rawColumnText($state) ?? $component->storedStringJson($state)) : null;
+
+                if ($text !== null) {
+                    $component->state($text);
+                }
+
                 return;
             }
 

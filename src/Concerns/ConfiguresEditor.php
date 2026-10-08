@@ -148,6 +148,41 @@ trait ConfiguresEditor
         return $raw;
     }
 
+    /**
+     * A top-level string that a cast (built-in or custom, e.g. one that keeps Cyrillic
+     * unescaped) decoded from a stored JSON string literal (`"123"`), as that literal.
+     * The text column that merely holds the same characters is not matched: its raw value
+     * is the state itself, not a JSON document that decodes to it.
+     */
+    protected function storedStringJson(string $state): ?string
+    {
+        $record = $this->getRecord();
+
+        if (!$this->isArray() || !$record instanceof Model) {
+            return null;
+        }
+
+        [$root, $path] = array_pad(explode('.', $this->getName(), 2), 2, null);
+
+        if (!$record->isClean($root)) {
+            return null;
+        }
+
+        $raw = $record->getRawOriginal($root);
+
+        if (!is_string($raw) || $raw === $state || trim($raw) === '' || !Json::check($raw)[0]) {
+            return null;
+        }
+
+        $decoded = json_decode($raw, true);
+
+        if (($path === null ? $decoded : data_get($decoded, $path)) !== $state) {
+            return null;
+        }
+
+        return json_encode($state, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: null;
+    }
+
     public function wrapLines(bool|Closure $condition = true): static
     {
         $this->wrapLines = $condition;
