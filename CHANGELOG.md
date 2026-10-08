@@ -2,7 +2,7 @@
 
 All notable changes to `asignua/filament-json-yaml-editor` are documented here.
 
-## Unreleased
+## v1.1.0 - 2026-10-08
 
 - Dependencies: js-yaml 4 to 5 (bundled; YAML timestamps now load as strings, `!!set` and other non-core tags are no longer accepted by default), esbuild 0.28, jsdom 30 (dev).
 - Security: an alias bomb combined with a merge key in a flow map can no longer exhaust memory; the expansion guard now also runs on the fallback parse (`Yaml::parse()`, `Yaml::decodeToArrays()`, `YamlRule`, `JsonSchemaRule::yaml()`).
