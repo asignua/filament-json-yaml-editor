@@ -2,6 +2,11 @@
 
 All notable changes to `asignua/filament-json-yaml-editor` are documented here.
 
+## v1.1.1 - 2026-10-25
+
+- Screenshots and the cover carry the «made in asign» mark; README shows the Stand With Ukraine badge.
+- Dependencies: js-yaml 5.5.0 and @codemirror/view 6.43.14 (bundled; dist rebuilt), jsdom 30.1.3 (dev), CI actions.
+
 ## v1.1.0 - 2026-10-08
 
 - Dependencies: js-yaml 4 to 5 (bundled; YAML timestamps now load as strings, `!!set` and other non-core tags are no longer accepted by default), esbuild 0.28, jsdom 30 (dev).
