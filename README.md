@@ -199,6 +199,15 @@ npm run build            # rebuild resources/dist/json-yaml-editor.js with esbui
 
 See [CHANGELOG](https://github.com/asignua/filament-json-yaml-editor/blob/main/CHANGELOG.md).
 
+## More plugins by asign
+
+- [Rich Editor Toolkit](https://filamentphp.com/plugins/asign-rich-editor-toolkit) — paste cleanup, attributes and video links in the rich editor
+- [Translatable Fields](https://filamentphp.com/plugins/asign-translatable-fields) — locale tabs for spatie/laravel-translatable forms
+- [Translation Manager](https://filamentphp.com/plugins/asign-translation-manager) — edit and scan Laravel translations in the panel
+- [Themes](https://filamentphp.com/plugins/asign-themes) — per-user and per-panel colour themes
+
+All plugins: <https://filamentphp.com/plugins?q=asign>
+
 ## License
 
 MIT. See [LICENSE](https://github.com/asignua/filament-json-yaml-editor/blob/main/LICENSE.md).
