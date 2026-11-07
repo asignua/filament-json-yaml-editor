@@ -2,6 +2,10 @@
 
 All notable changes to `asignua/filament-json-yaml-editor` are documented here.
 
+## v1.1.2 - 2026-11-07
+
+- Rebuilt `resources/dist` with `@codemirror/view` 6.43.15. After updating, run `php artisan filament:assets`.
+
 ## v1.1.1 - 2026-10-25
 
 - Screenshots and the cover carry the «made in asign» mark; README shows the Stand With Ukraine badge.
