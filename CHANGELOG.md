@@ -5,6 +5,7 @@ All notable changes to `asignua/filament-json-yaml-editor` are documented here.
 ## v1.2.0 - 2026-11-10
 
 - Requires Filament ^5.11.2; no deprecated Filament API was in use, so no code changes.
+- Laravel 13 deprecations: the workbench panel uses `PreventRequestForgery` (with a `VerifyCsrfToken` fallback for Laravel 12). Laravel 12 is still supported.
 
 ## v1.1.2 - 2026-11-07
 
