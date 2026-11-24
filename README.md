@@ -208,6 +208,8 @@ See [CHANGELOG](https://github.com/asignua/filament-json-yaml-editor/blob/main/C
 
 All plugins: <https://filamentphp.com/plugins?q=asign>
 
+Catalogue of free and commercial plugins: <https://asign.tech/en/plugins>
+
 ## License
 
 MIT. See [LICENSE](https://github.com/asignua/filament-json-yaml-editor/blob/main/LICENSE.md).
